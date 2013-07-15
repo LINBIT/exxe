@@ -1,0 +1,179 @@
+#! /bin/sh
+
+. $srcdir/test-lib.sh
+use_local_exxe
+use_tmpdir
+
+backspace="`echo -e '\b'`"
+
+# ==============================================================
+# Invoke commands directly and report their output and status
+# on standard output.
+
+check 'exxe echo foo' <<EOF
+> foo
+? 0
+EOF
+
+check 'exxe echo -e "foo\nbar"' <<EOF
+> foo
+> bar
+? 0
+EOF
+
+check "exxe echo 'foo${backspace}bar'" <<EOF
+>8 foo${backspace}bar
+? 0
+EOF
+
+check 'exxe sh -c "echo foo"' <<EOF
+> foo
+? 0
+EOF
+
+check 'exxe sh -c "echo foo; sleep 0.1; echo bar >&2"' <<EOF
+> foo
+2> bar
+? 0
+EOF
+
+check 'exxe sh -c "echo bar >&2; sleep 0.1; echo foo"' <<EOF
+> foo
+2> bar
+? 0
+EOF
+
+# Read from standard input (default for direct commands)
+check 'echo foo | exxe cat' <<EOF
+> foo
+? 0
+EOF
+
+# Do not read from standard input
+check 'echo foo | exxe -n cat' <<EOF
+? 0
+EOF
+
+check 'exxe ./missing' <<EOF
+2> ./missing: No such file or directory
+? 127
+EOF
+
+# ==============================================================
+# Exit status
+
+check 'exxe sh -c "exit 1"' <<EOF
+? 1
+EOF
+
+check 'exxe sh -c "exit 255"' <<EOF
+? 255
+EOF
+
+# Only the low 8 bits in the exit status are meaningful
+check 'exxe sh -c "exit 256"' <<EOF
+? 0
+EOF
+
+# ==============================================================
+# Termination by signal
+
+check 'exxe kill -INT 0' <<EOF
+$ 2 Interrupt
+EOF
+
+check 'exxe kill -ALRM 0' <<EOF
+$ 14 Alarm clock
+EOF
+
+check 'exxe kill -TERM 0' <<EOF
+$ 15 Terminated
+EOF
+
+# ==============================================================
+# Read the commands to run from standard input ("server").
+
+check 'echo "! echo foo" | exxe' <<EOF
+> foo
+? 0
+EOF
+
+check '( echo "> foo"; echo "> bar"; echo "! cat" ) | exxe' <<EOF
+> foo
+> bar
+? 0
+EOF
+
+check "echo ! test -n \' \' | exxe" <<EOF
+? 0
+EOF
+
+check 'echo garbage | exxe || echo status: $?' <<EOF
+Invalid command 'g'
+status: 1
+EOF
+
+# ==============================================================
+# Input to the "server".
+
+check 'exxe -i echo foo' <<EOF
+! echo foo
+EOF
+
+check '(echo foo; echo bar) | exxe -i cat' <<EOF
+> foo
+> bar
+! cat
+EOF
+
+check "echo -n foo | exxe -i cat" <<EOF
+>3 foo
+! cat
+EOF
+
+check "echo foo${backspace}bar | exxe -i cat" <<EOF
+>8 foo${backspace}bar
+! cat
+EOF
+
+check 'exxe -i test -z ""' <<EOF
+! test -z ''
+EOF
+
+check 'exxe -i test -z " "' <<EOF
+! test -z ' '
+EOF
+
+check "exxe -i test -z \'" <<EOF
+! test -z \'
+EOF
+
+check 'exxe -i test -z \\' <<EOF
+! test -z \\\\
+EOF
+
+check 'exxe -i test -z "
+"' <<EOF
+! test -z '
+'
+EOF
+
+
+# ==============================================================
+# Output from the "server".
+
+check 'echo "? 23" | exxe -o || echo status: $?' <<EOF
+status: 23
+EOF
+
+check '(echo "> foo"; echo "2> bar"; echo "? 0") | exxe -o 2> /dev/null' <<EOF
+foo
+EOF
+
+check '(echo "> foo"; echo "2> bar"; echo "? 0") | exxe -o > /dev/null' <<EOF
+bar
+EOF
+
+check 'echo "$ 2 Interrupt" | exxe -o || echo status: $?' <<EOF
+status: 130
+EOF
