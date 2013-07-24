@@ -122,12 +122,88 @@ static int write_to(int *pfd, struct buffer *buffer, const char *which)
 	return 0;
 }
 
+static void print_errno_error(const char *command)
+{
+	static char *out_of_memory = "Out of memory\n";
+	int size;
+	char *message = NULL;
+
+	size = asprintf(&message, "%s: %s: %s\n",
+			progname, command, strerror(errno));
+	if (size < 0) {
+		message = out_of_memory;
+		size = strlen(out_of_memory);
+	}
+	print_str(message, strlen(message), 2);
+	if (message != out_of_memory)
+		free(message);
+}
+
+static int do_export(char *argv[], struct buffer *in_buffer)
+{
+	char *name = NULL;
+	const char *eq = NULL;
+
+	if (!argv[1]) {
+		errno = ENOTSUP;
+		return -1;
+	}
+	for (argv++; *argv; argv++) {
+		const char *value;
+		int ret;
+
+		eq = strchr(*argv, '=');
+		if (eq) {
+			name = strndup(*argv, eq - *argv);
+			value = eq + 1;
+			ret = setenv(name, value, 1);
+			free(name);
+			if (ret != 0)
+				return -1;
+		}
+	}
+	return 0;
+}
+
+struct internal_command {
+	const char *name;
+	int (*command)(char *argv[], struct buffer *in_buffer);
+};
+
+struct internal_command internal_commands[] = {
+	{"export", do_export},
+	{}
+};
+
+static bool do_internal(char *argv[], struct buffer *in_buffer)
+{
+	struct internal_command *command;
+
+	for (command = internal_commands; command->name; command++) {
+		if (!strcmp(argv[0], command->name)) {
+			int ret;
+
+			ret = command->command(argv, in_buffer);
+			if (ret < 0) {
+				print_errno_error(argv[0]);
+				ret = 1;
+			}
+			printf("? %d\n", ret);
+			return true;
+		}
+	}
+	return false;
+}
+
 int run_command(const char *file, char *argv[], struct buffer *in_buffer, int flags)
 {
 	static int dev_null = -1;
 	pid_t pid;
 	int in[2], out[2], err[2];
 	int ret;
+
+	if (do_internal(argv, in_buffer))
+		return 0;
 
 	if (in_buffer) {
 		ret = pipe2(in, O_CLOEXEC);

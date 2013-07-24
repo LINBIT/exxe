@@ -177,3 +177,18 @@ EOF
 check 'echo "$ 2 Interrupt" | exxe -o || echo status: $?' <<EOF
 status: 130
 EOF
+
+# ==============================================================
+# Internal commands
+
+check 'echo -e "! export FOO=bar BAR=foo\\n! sh -c echo\\ \$FOO\ \$BAR" | exxe' <<EOF
+? 0
+> bar foo
+? 0
+EOF
+
+check 'echo -e "! export" | exxe' <<EOF
+2> exxe: export: Operation not supported
+? 1
+EOF
+
