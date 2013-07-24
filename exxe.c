@@ -11,6 +11,7 @@
 #include <fcntl.h>
 #include <sys/select.h>
 #include <sys/types.h>
+#include <sys/stat.h>
 #include <sys/wait.h>
 #include <signal.h>
 #include <locale.h>
@@ -174,6 +175,24 @@ static int do_export(char *argv[], struct buffer *in_buffer)
 	return 0;
 }
 
+static int do_umask(char *argv[], struct buffer *in_buffer)
+{
+	unsigned long mask;
+	char *end;
+
+	if (!argv[1]) {
+		errno = ENOTSUP;
+		return -1;
+	}
+	mask = strtoul(argv[1], &end, 8);
+	if (*end || mask > 07777) {
+		errno = EINVAL;
+		return -1;
+	}
+	umask(mask);
+	return 0;
+}
+
 struct internal_command {
 	const char *name;
 	int (*command)(char *argv[], struct buffer *in_buffer);
@@ -182,6 +201,7 @@ struct internal_command {
 struct internal_command internal_commands[] = {
 	{"cd", do_chdir},
 	{"export", do_export},
+	{"umask", do_umask},
 	{}
 };
 
