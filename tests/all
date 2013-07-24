@@ -179,6 +179,40 @@ status: 130
 EOF
 
 # ==============================================================
+# Input to and output from the "server" at once.
+
+ncheck 'mkfifo io oi'
+
+exxe < io > oi &
+CHILD_PID=$!
+check 'echo foo | exxe -Iio -Ooi cat' <<EOF
+foo
+EOF
+ncheck 'wait $CHILD_PID || echo status: $?'
+
+exxe < io > oi &
+CHILD_PID=$!
+exec 17>io 18<oi
+check 'exxe -I17 -O18 echo bar' <<EOF
+bar
+EOF
+check 'exxe -I17 -O18 echo baz' <<EOF
+baz
+EOF
+exec 17>&- 18<&-
+ncheck 'wait $CHILD_PID || echo status: $?'
+
+check 'exxe -I17 echo foo || echo status: $?' <<EOF
+17: No such file or directory
+status: 1
+EOF
+
+check 'exxe -O18 || echo status: $?' <<EOF
+18: No such file or directory
+status: 1
+EOF
+
+# ==============================================================
 # Internal commands
 
 check 'echo -e "! export FOO=bar BAR=foo\\n! sh -c echo\\ \$FOO\ \$BAR" | exxe' <<EOF

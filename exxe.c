@@ -28,7 +28,9 @@
 static struct option long_options[] = {
 	{"no-stdin", no_argument, 0, 'n' },
 	{"in",       no_argument, 0, 'i' },
+	{"in-from",  required_argument, 0, 'I' },
 	{"out",      no_argument, 0, 'o' },
+	{"out-to",   required_argument, 0, 'O' },
 	{"help",     no_argument, 0, 'h' },
 	{}
 };
@@ -414,9 +416,26 @@ static void usage(const char *fmt, ...)
 	exit(fmt ? 2 : 0);
 }
 
+static int use_fd_or_open_file(const char *opt, int flags)
+{
+	char *end;
+	int fd;
+
+	fd = strtoul(opt, &end, 10);
+	if (!*end) {
+		if (fcntl(fd, F_GETFD) >= 0)
+			return fd;
+	}
+	fd = open(opt, flags);
+	if (fd < 0)
+		fatal("%s: %s", opt, strerror(errno));
+	return fd;
+}
+
 int main(int argc, char *argv[])
 {
-	bool opt_input = false, opt_output = false;
+	int opt_input = -1, opt_output = -1;
+	int opt_server = false, opt_test = false;
 	bool opt_stdin = true;
 
 	progname = basename(argv[0]);
@@ -424,16 +443,24 @@ int main(int argc, char *argv[])
 	for(;;) {
 		int c;
 
-		c = getopt_long(argc, argv, "+nioh", long_options, NULL);
+		c = getopt_long(argc, argv, "+niI:oO:h", long_options, NULL);
 		if (c == -1)
 			break;
 
 		switch(c) {
 		case 'i':
-			opt_input = true;
+			optarg = NULL;
+			/* fall through */
+		case 'I':
+			/* write to standard output by default */
+			opt_input = optarg ? use_fd_or_open_file(optarg, O_WRONLY) : 1;
 			break;
 		case 'o':
-			opt_output = true;
+			optarg = NULL;
+			/* fall through */
+		case 'O':
+			/* read from standard input by default */
+			opt_output = optarg ? use_fd_or_open_file(optarg, O_RDONLY) : 0;
 			break;
 		case 'n':
 			/* Redirect standard input to /dev/null.  Only
@@ -449,9 +476,23 @@ int main(int argc, char *argv[])
 		};
 	}
 
-	if (opt_input) {
+	if (opt_input == -1 && opt_output == -1) {
+		opt_server = optind == argc;
+		opt_test = !opt_server;
+	}
+
+	if (opt_input != -1) {
+		int stdout_dup = -1;
 
 		/* input to server */
+
+		if (opt_input != 1) {
+			stdout_dup = dup(1);
+			if (stdout_dup < 0)
+				fatal("duplicating standard output");
+			if (dup2(opt_input, 1) < 0)
+				fatal("file descriptor %d: %s", opt_input, strerror(errno));
+		}
 
 		if (optind == argc)
 			usage("command-line arguments missing");
@@ -480,10 +521,29 @@ int main(int argc, char *argv[])
 			print_arg(argv[optind]);
 		}
 		fputc('\n', stdout);
-	} else if (opt_output) {
+		if (fflush(stdout) != 0)
+			fatal("writing");
+		if (stdout_dup != -1) {
+			if (dup2(stdout_dup, 1) < 0)
+				fatal("restoring standard output");
+			close(stdout_dup);
+			if (close(opt_input))
+				fatal("closing file descriptor for writing");
+		}
+	}
+	if (opt_output != -1) {
 		struct output_command command;
+		int stdin_dup = -1;
 
 		/* output from server */
+
+		if (opt_output != 0) {
+			stdin_dup = dup(0);
+			if (stdin_dup < 0)
+				fatal("duplicating standard input");
+			if (dup2(opt_output, 0) < 0)
+				fatal("file descriptor %d: %s", opt_output, strerror(errno));
+		}
 
 		if (optind != argc)
 			usage("no command-line arguments allowed");
@@ -512,7 +572,16 @@ int main(int argc, char *argv[])
 				exit(0);
 			}
 		}
-	} else if (optind == argc) {
+
+		if (stdin_dup != -1) {
+			if (dup2(stdin_dup, 0) < 0);
+				fatal("restoring standard input");
+			close(stdin_dup);
+			if (close(opt_output))
+				fatal("closing file descriptor for reading");
+		}
+	}
+	if (opt_server) {
 		struct input_command command;
 
 		/* server mode */
@@ -537,7 +606,8 @@ int main(int argc, char *argv[])
 		}
 		free_buffer(&command.input);
 		free_argv(command.argv);
-	} else {
+	}
+	if (opt_test) {
 
 		/* test mode */
 
