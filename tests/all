@@ -192,3 +192,13 @@ check 'echo -e "! export" | exxe' <<EOF
 ? 1
 EOF
 
+check 'echo -e "! cd /\\n! pwd" | exxe' <<EOF
+? 0
+> /
+? 0
+EOF
+
+check 'echo -e "! cd" | exxe' <<EOF
+2> exxe: cd: Operation not supported
+? 1
+EOF

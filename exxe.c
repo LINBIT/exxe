@@ -139,6 +139,15 @@ static void print_errno_error(const char *command)
 		free(message);
 }
 
+static int do_chdir(char *argv[], struct buffer *in_buffer)
+{
+	if (!argv[1]) {
+		errno = ENOTSUP;
+		return -1;
+	}
+	return chdir(argv[1]);
+}
+
 static int do_export(char *argv[], struct buffer *in_buffer)
 {
 	char *name = NULL;
@@ -171,6 +180,7 @@ struct internal_command {
 };
 
 struct internal_command internal_commands[] = {
+	{"cd", do_chdir},
 	{"export", do_export},
 	{}
 };
