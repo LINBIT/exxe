@@ -31,6 +31,7 @@ static struct option long_options[] = {
 	{"in-from",  required_argument, 0, 'I' },
 	{"out",      no_argument, 0, 'o' },
 	{"out-to",   required_argument, 0, 'O' },
+	{"version",  no_argument, 0, 'v' },
 	{"help",     no_argument, 0, 'h' },
 	{}
 };
@@ -443,7 +444,7 @@ int main(int argc, char *argv[])
 	for(;;) {
 		int c;
 
-		c = getopt_long(argc, argv, "+niI:oO:h", long_options, NULL);
+		c = getopt_long(argc, argv, "+niI:oO:vh", long_options, NULL);
 		if (c == -1)
 			break;
 
@@ -468,6 +469,10 @@ int main(int argc, char *argv[])
 			 * command line; otherwise, we never read from
 			 * exxe's standard input.  */
 			opt_stdin = false;
+			break;
+		case 'v':
+			printf("%s %s\n", PACKAGE_NAME, PACKAGE_VERSION);
+			exit(0);
 			break;
 		case 'h':
 			usage(NULL);
