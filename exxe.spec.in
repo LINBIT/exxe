@@ -1,0 +1,33 @@
+Name: @PACKAGE@
+Version: @VERSION@
+Release: 0
+Summary: Execute commands indirectly
+Source0: %{name}-%{version}.tar.gz
+License: GPL v3.0
+Group: Development/Tools
+BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-buildroot
+Prefix: %{_prefix}
+Vendor: @PACKAGE_BUGREPORT@
+Url: @PACKAGE_URL@
+BuildRequires: gcc
+
+%description
+A shell-like utility that executes arbitrary commands read from standard input
+and reports the results of those commands on standard output.
+
+%prep
+%setup -n %{name}-%{version}
+
+%build
+%configure
+make
+
+%install
+make install DESTDIR=%{buildroot}
+
+%clean
+rm -rf %{buildroot}
+
+%files
+%defattr(-,root,root)
+/usr/bin/exxe

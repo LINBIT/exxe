@@ -8,6 +8,7 @@ AC_CONFIG_FILES([
 	Makefile
 	exxe/Makefile
 	tests/Makefile
+	exxe.spec
 ])
 AM_INIT_AUTOMAKE
 AM_SILENT_RULES([yes])
