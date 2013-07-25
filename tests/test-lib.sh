@@ -18,7 +18,7 @@ use_tmpdir() {
 }
 
 use_local_exxe() {
-    test -n "$XTEST" || XTEST=$abs_top_builddir/exxe
+    test -n "$XTEST" || XTEST=$abs_top_builddir/exxe/exxe
 
     eval 'exxe() {
           $XTEST "$@"

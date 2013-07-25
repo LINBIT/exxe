@@ -1,6 +1,38 @@
-exxe
-=====
+exxe  -  Execute commands indirectly
+====================================
 
-What does it do?
-How to use?
-Syntax?
+A shell-like utility that executes arbitrary commands read from standard input
+and reports the results of those commands on standard output.  Results include
+what commands write to their standard output and standard error, and the exit
+status or signal that the command terminates with.  The utility is meant for
+relatively short-running commands that produce moderate amounts of output; it
+is not useful for commands whose output is processed as a stream of data.
+
+The exxe utility can be run locally or remotely (for example, over ssh); this
+can be useful for testing and automation.
+
+For example, the following input:
+
+	> hello world!
+	! tr a-z A-Z
+
+will execute the tr command and pass it a line of input; on success, the output
+will be as follows:
+
+	> HELLO WORLD!
+	? 0
+
+The exxe utility can be used in "client mode" to produce the appropriate input
+for running a command, as well as for translating the output back into its
+original form.  For example, the following command will produce the above
+output:
+
+	echo '> hello world!' | exxe -i tr a-z A-Z
+
+and the following two commands will produce the same result:
+
+	echo 'hello world!' | tr a-z A-Z
+
+	echo 'hello world!' | exxe -i tr a-z A-Z | exxe | exxe -o
+
+See the test suite for other use cases.

@@ -1,0 +1,16 @@
+Requirements for building from the GIT repository:
+
+	* autoconf
+	* automake
+
+You can get a copy of the source repository like this:
+
+	$ git clone git@github.com:andreas-gruenbacher/exxe.git
+	$ cd exxe
+
+Bootstrap the source repository with:
+
+	$ ./bootstrap
+
+Then, follow the instructions in INSTALL for building and installing this
+package.

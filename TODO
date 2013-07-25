@@ -1,3 +1,4 @@
-* README
+* man page
 * Implement double quoting and $ENV variable substitution?
 * Timeout for commands
+* Document the syntax
