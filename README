@@ -27,7 +27,7 @@ for running a command, as well as for translating the output back into its
 original form.  For example, the following command will produce the above
 output:
 
-	echo '> hello world!' | exxe -i tr a-z A-Z
+	echo 'hello world!' | exxe -i tr a-z A-Z
 
 and the following two commands will produce the same result:
 
