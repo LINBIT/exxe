@@ -81,3 +81,19 @@ check 'echo -e "! export FOO=two\\ words\n! sh -c \"set -- \$FOO; echo \$#\"" | 
 > 2
 ? 0
 EOF
+
+check 'echo -e "! export DQ=\"\\\"  \\\"\"\n! echo \$DQ\n! echo \"+\$DQ+\"" | exxe' <<EOF
+? 0
+> " "
+? 0
+> +"  "+
+? 0
+EOF
+
+check "echo -e \"! export SQ=\\\"'  '\\\"\\n! echo \\\$SQ\\n! echo \\\"+\\\$SQ+\\\"\" | exxe" <<EOF
+? 0
+> ' '
+? 0
+> +'  '+
+? 0
+EOF

@@ -167,7 +167,7 @@ static void parse_single_quoted(struct buffer *buffer)
 {
 	int c = input();
 
-	while (c != EOF && c != '\'') {
+	while (c != EOF && (is_expanded_input || c != '\'')) {
 		put_buffer(buffer, c);
 		c = input();
 	}
@@ -179,11 +179,11 @@ static void parse_double_quoted(struct buffer *buffer)
 {
 	int c = input();
 
-	while (c != EOF && c != '"') {
+	while (c != EOF && (is_expanded_input || c != '"')) {
+		if (is_expanded_input)
+			goto escaped;
 		switch(c) {
 		case '$':
-			if (is_expanded_input)
-				goto escaped;
 			parse_dollar(buffer);
 			break;
 		case '\\':
@@ -211,6 +211,18 @@ static bool parse_word(struct buffer *buffer, bool *more)
 		c = input();
 	for(;;) {
 		switch(c) {
+		case ' ': case '\t':
+			*more = true;
+			goto out;
+		case '\n':
+			*more = false;
+			goto out;
+		}
+
+		if (is_expanded_input)
+			goto escaped;
+
+		switch(c) {
 		case EOF:
 			goto out;
 		case '\'':
@@ -229,16 +241,8 @@ static bool parse_word(struct buffer *buffer, bool *more)
 				break;
 			goto escaped;
 		case '$':
-			if (is_expanded_input)
-				goto escaped;
 			parse_dollar(buffer);
 			break;
-		case ' ': case '\t':
-			*more = true;
-			goto out;
-		case '\n':
-			*more = false;
-			goto out;
 		escaped: default:
 			defined = true;
 			put_buffer(buffer, c);
