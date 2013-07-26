@@ -237,13 +237,13 @@ check 'echo -e "! cd" | exxe' <<EOF
 ? 1
 EOF
 
-check 'echo -e "! umask 0022\\n! sh -c umask" | exxe' <<EOF
+check 'echo -e "! umask 0022\\n! umask" | exxe' <<EOF
 ? 0
 > 0022
 ? 0
 EOF
 
-check 'echo -e "! umask 0002\\n! sh -c umask" | exxe' <<EOF
+check 'echo -e "! umask 0002\\n! umask" | exxe' <<EOF
 ? 0
 > 0002
 ? 0
@@ -251,10 +251,5 @@ EOF
 
 check 'echo -e "! umask 10000" | exxe' <<EOF
 2> exxe: umask: Invalid argument
-? 1
-EOF
-
-check 'echo -e "! umask" | exxe' <<EOF
-2> exxe: umask: Operation not supported
 ? 1
 EOF

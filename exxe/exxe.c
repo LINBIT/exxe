@@ -184,11 +184,14 @@ static int do_umask(char *argv[], struct buffer *in_buffer)
 	char *end;
 
 	if (!argv[1]) {
-		errno = ENOTSUP;
-		return -1;
+		int mask;
+
+		mask = umask(0); umask(mask);
+		printf("> %04o\n", mask);
+		return 0;
 	}
 	mask = strtoul(argv[1], &end, 8);
-	if (*end || mask > 07777) {
+	if (*end || mask > 0777) {
 		errno = EINVAL;
 		return -1;
 	}
