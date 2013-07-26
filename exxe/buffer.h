@@ -76,4 +76,6 @@ int unget_buffer(struct buffer *buffer, int c);
 void free_buffer(struct buffer *buffer);
 char *steal_buffer(struct buffer *buffer);
 
+extern struct buffer expanded_input;
+
 #endif  /* __BUFFER_H */

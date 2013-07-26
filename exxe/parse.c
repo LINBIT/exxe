@@ -10,15 +10,31 @@
 #include "error.h"
 #include "parse.h"
 
+/* Expanded variables are put into the expanded_input buffer; the parser reads
+   them from there. */
+struct buffer expanded_input;
+bool is_expanded_input = false;
+
 static int input(void)
 {
+	if (is_expanded_input) {
+		int c = get_buffer(&expanded_input);
+		if (c != EOF)
+			return c;
+		reset_buffer(&expanded_input);
+		is_expanded_input = false;
+	}
 	return fgetc(stdin);
 }
 
 static void unput(int c)
 {
-	if (c != EOF)
-		ungetc(c, stdin);
+	if (c != EOF) {
+		if (is_expanded_input)
+			unget_buffer(&expanded_input, c);
+		else
+			ungetc(c, stdin);
+	}
 }
 
 static bool parse_number(unsigned int *number)
@@ -85,6 +101,68 @@ static void parse_data(struct buffer *buffer)
 	}
 }
 
+static inline bool isname(char c)
+{
+	return (c >= 'a' && c <= 'z') ||
+	       (c >= 'A' && c <= 'Z') ||
+	       c == '_';
+}
+
+static void expand_variable(struct buffer *name)
+{
+	char *value;
+
+	put_buffer(name, 0);
+	value = getenv(buffer_read_pos(name));
+	if (value) {
+		size_t size = strlen(value);
+		grow_buffer(&expanded_input, size);
+		memcpy(buffer_write_pos(&expanded_input), value, size);
+		buffer_advance_write(&expanded_input, size);
+		is_expanded_input = true;
+	}
+}
+
+static void parse_dollar(struct buffer *buffer)
+{
+	struct buffer name;
+	int c = input();
+
+	switch(c) {
+	case '!': case '?': case '*': case '@': case '-': case '_': case '$':
+		fatal("Parameter '$%c' not supported", c);
+	case '{':
+		init_buffer(&name); /* FIXME: Only start with a small buffer ...  */
+		for(;;) {
+			c = input();
+			if (c == '}')
+				break;
+			if (!isname(c))
+				fatal("Invalid character '%c' in ${...} substitution", c);
+			put_buffer(&name, c);
+		}
+		expand_variable(&name);
+		free_buffer(&name);
+		return;
+	}
+	if (c >= '0' && c <= '9')
+		fatal("Parameter '$%c' not supported", c);
+	else if (isname(c)) {
+		init_buffer(&name); /* FIXME: Only start with a small buffer ...  */
+		do {
+			put_buffer(&name, c);
+			c = input();
+		} while (isname(c));
+		unput(c);
+		expand_variable(&name);
+		free_buffer(&name);
+	} else {
+		put_buffer(&expanded_input, '$');
+		unput(c);
+		is_expanded_input = true;
+	}
+}
+
 static void parse_single_quoted(struct buffer *buffer)
 {
 	int c = input();
@@ -119,6 +197,11 @@ static bool parse_word(struct buffer *buffer, bool *more)
 			if (c == '\n')
 				break;
 			goto escaped;
+		case '$':
+			if (is_expanded_input)
+				goto escaped;
+			parse_dollar(buffer);
+			break;
 		case ' ': case '\t':
 			*more = true;
 			goto out;

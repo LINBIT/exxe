@@ -500,6 +500,8 @@ int main(int argc, char *argv[])
 		opt_test = !opt_server;
 	}
 
+	init_buffer(&expanded_input);
+
 	if (opt_input != -1) {
 		int stdout_dup = -1;
 

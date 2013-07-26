@@ -1,0 +1,71 @@
+#! /bin/sh
+
+. $srcdir/test-lib.sh
+use_local_exxe
+use_tmpdir
+
+# ==============================================================
+# Invoke commands directly and report their output and status
+# on standard output.
+
+check 'exxe echo +\ +' <<EOF
+> + +
+? 0
+EOF
+
+check "exxe echo +' '+" <<EOF
+> + +
+? 0
+EOF
+
+check 'exxe echo +" "+' <<EOF
+> + +
+? 0
+EOF
+
+check 'exxe echo +\
++' <<EOF
+> ++
+? 0
+EOF
+
+check 'exxe echo +"\
+"+' <<EOF
+> ++
+? 0
+EOF
+
+check "exxe echo +'\\
+'+" <<EOF
+> +\\
+> +
+? 0
+EOF
+
+check "exxe echo \\' '\\'" <<EOF
+> ' \\
+? 0
+EOF
+
+check 'exxe echo \" "\\"' <<EOF
+> " \\
+? 0
+EOF
+
+check "echo -e \"! export DOLLAR=$\n! echo '\\\$DOLLAR'\" | exxe" <<EOF
+? 0
+> \$DOLLAR
+? 0
+EOF
+
+check 'echo -e "! export DOLLAR=$\n! echo \$DOLLAR" | exxe' <<EOF
+? 0
+> \$
+? 0
+EOF
+
+check 'echo -e "! export DOLLAR=$\n! echo \${DOLLAR}" | exxe' <<EOF
+? 0
+> \$
+? 0
+EOF

@@ -1,5 +1,6 @@
 TESTS = \
-	all
+	all \
+	quoting_and_variables
 
 EXTRA_DIST = \
 	$(TESTS) \
