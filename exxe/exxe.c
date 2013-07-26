@@ -399,21 +399,32 @@ static void usage(const char *fmt, ...)
 		va_end(ap);
 		fputs("\n\n", stderr);
 	}
-	fprintf(fmt ? stdout : stderr,
-		"USAGE: %s [-o], %s [-i] {command} ...\n"
-		"\n"
-		"Execute a command and report its result on standard output\n"
-		"(%s [-n] {command} ...), execute one or more commands indirectly\n"
-		"as defined by standard input (%s), produce the input for indirect\n"
-		"execution (%s [-n] -i {command} ...), or process the output of\n"
-		"indirect execution.\n"
-		"\n"
-		"The following is roughly equivalent to running {command} directly:\n"
-		"  %s [-n] -i {command} | exxe | exxe -o\n"
-		"\n"
-		"OPTIONS:\n"
-		"  -n  Do not read from standard input\n",
-		progname, progname, progname, progname, progname, progname);
+	fputs(
+"Execute commands indirectly.  This utility can be used in four different\n"
+"modes:\n"
+"\n"
+"  " PACKAGE_NAME "\n"
+"    Act as a server: execute commands read from standard input, and report\n"
+"    the results on standard output.\n"
+"\n"
+"  " PACKAGE_NAME " -i [-n] {command} ...\n"
+"    Produce the input the server expects for running {command}.  By default,\n"
+"    the standard input is passed on to the server; the -n option can be used\n"
+"    to prevent that.  Can be run multiple times to send multiple commands\n"
+"    to a server.\n"
+"\n"
+"  " PACKAGE_NAME " -o\n"
+"    Read and process the server's output: produce the same output as the\n"
+"    command executed by the server, and terminate with the same exit status\n"
+"    or signal.  Can be rerun to read the output of the next command.\n"
+"\n"
+"  " PACKAGE_NAME " [-n] {command}\n"
+"    Execute {command} directly, but produce the same output that the\n"
+"    utility would produce in server mode.  The -n option can be used to\n"
+"    prevent the utility from reading from standard input.\n"
+"\n"
+"The following is roughly equivalent to running {command} directly:\n"
+"  " PACKAGE_NAME " [-n] -i {command} | " PACKAGE_NAME " | " PACKAGE_NAME " -o\n", fmt ? stdout : stderr);
 	exit(fmt ? 2 : 0);
 }
 
