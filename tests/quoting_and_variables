@@ -64,8 +64,20 @@ check 'echo -e "! export DOLLAR=$\n! echo \$DOLLAR" | exxe' <<EOF
 ? 0
 EOF
 
+check 'echo -e "! export DOLLAR=$\n! echo \"\$DOLLAR\"" | exxe' <<EOF
+? 0
+> \$
+? 0
+EOF
+
 check 'echo -e "! export DOLLAR=$\n! echo \${DOLLAR}" | exxe' <<EOF
 ? 0
 > \$
+? 0
+EOF
+
+check 'echo -e "! export FOO=two\\ words\n! sh -c \"set -- \$FOO; echo \$#\"" | exxe' <<EOF
+? 0
+> 2
 ? 0
 EOF

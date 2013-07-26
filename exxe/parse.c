@@ -175,6 +175,33 @@ static void parse_single_quoted(struct buffer *buffer)
 		fatal("Unexpected EOF while looking for matching single quote");
 }
 
+static void parse_double_quoted(struct buffer *buffer)
+{
+	int c = input();
+
+	while (c != EOF && c != '"') {
+		switch(c) {
+		case '$':
+			if (is_expanded_input)
+				goto escaped;
+			parse_dollar(buffer);
+			break;
+		case '\\':
+			c = input();
+			if (c == '\n')
+				break;
+			if (c == EOF)
+				fatal("Unexpected EOF after backslash");
+			/* fall through */
+		escaped: default:
+			put_buffer(buffer, c);
+		}
+		c = input();
+	}
+	if (c == EOF)
+		fatal("Unexpected EOF while looking for matching single quote");
+}
+
 static bool parse_word(struct buffer *buffer, bool *more)
 {
 	bool defined = false;
@@ -189,6 +216,10 @@ static bool parse_word(struct buffer *buffer, bool *more)
 		case '\'':
 			defined = true;
 			parse_single_quoted(buffer);
+			break;
+		case '"':
+			defined = true;
+			parse_double_quoted(buffer);
 			break;
 		case '\\':
 			c = input();
