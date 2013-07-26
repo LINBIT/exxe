@@ -25,14 +25,14 @@ will be as follows:
 The exxe utility can be used in "client mode" to produce the appropriate input
 for running a command, as well as for translating the output back into its
 original form.  For example, the following command will produce the above
-output:
+input:
 
 	echo 'hello world!' | exxe -i tr a-z A-Z
 
-and the following two commands will produce the same result:
+and the following two commands will both produce the same result:
 
 	echo 'hello world!' | tr a-z A-Z
 
 	echo 'hello world!' | exxe -i tr a-z A-Z | exxe | exxe -o
 
-See the test suite for other use cases.
+See the test suite for more use cases.
