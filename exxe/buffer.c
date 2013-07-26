@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include "xalloc.h"
 #include "buffer.h"
 
@@ -41,4 +42,13 @@ char *steal_buffer(struct buffer *buffer)
 	b = xrealloc(buffer->buffer, buffer_size(buffer));
 	init_buffer(buffer);
 	return b;
+}
+
+int unget_buffer(struct buffer *buffer, int c)
+{
+	if (buffer->start == 0)
+		return EOF;
+	buffer->start--;
+	*buffer_read_pos(buffer) = c;
+	return c;
 }

@@ -60,6 +60,19 @@ static inline void put_buffer(struct buffer *buffer, char c)
 	buffer_advance_write(buffer, 1);
 }
 
+static inline int get_buffer(struct buffer *buffer)
+{
+	char c;
+
+	if (buffer_size(buffer) == 0)
+		return EOF;
+	c = *buffer_read_pos(buffer);
+	buffer_advance_read(buffer, 1);
+	return (unsigned char)c;
+}
+
+int unget_buffer(struct buffer *buffer, int c);
+
 void free_buffer(struct buffer *buffer);
 char *steal_buffer(struct buffer *buffer);
 
