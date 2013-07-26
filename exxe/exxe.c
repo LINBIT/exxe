@@ -361,7 +361,7 @@ static bool strchrs(const char *any, const char *str)
 
 static void print_arg(const char *arg)
 {
-	if (!*arg || strchrs("\\\' \t\n", arg)) {
+	if (!*arg || strchrs("\\\'\"$ \t\n", arg)) {
 		bool single_quoted = false;
 
 		if (!*arg ||
@@ -383,8 +383,11 @@ static void print_arg(const char *arg)
 					fputc('\'', stdout);
 					single_quoted = true;
 				}
-			} else
+			} else {
+				if (strchr("\"$", *arg) && !single_quoted)
+					fputc('\\', stdout);
 				fputc(*arg, stdout);
+			}
 		}
 		if (single_quoted)
 			fputc('\'', stdout);
