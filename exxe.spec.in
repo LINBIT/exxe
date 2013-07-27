@@ -1,8 +1,10 @@
+%define src_version @VERSION@
+
 Name: @PACKAGE@
-Version: @VERSION@
-Release: 0
+Version: %(set -- %{src_version}; echo ${1%%-*})
+Release: %(set -- %{src_version}; if [ ${1#*-} != $1 ]; then echo ${1#*-}; else echo 0; fi)
 Summary: Execute commands indirectly
-Source0: %{name}-%{version}.tar.gz
+Source0: %{name}-%{src_version}.tar.gz
 License: GPL v3.0
 Group: Development/Tools
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-buildroot
@@ -16,7 +18,7 @@ A shell-like utility that executes arbitrary commands read from standard input
 and reports the results of those commands on standard output.
 
 %prep
-%setup -n %{name}-%{version}
+%setup -n %{name}-%{src_version}
 
 %build
 %configure
