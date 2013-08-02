@@ -279,8 +279,8 @@ int run_command(const char *file, char *argv[], struct buffer *in_buffer, int fl
 		fcntl(out[0], F_SETFL, O_NONBLOCK);
 		fcntl(err[0], F_SETFL, O_NONBLOCK);
 
-		init_buffer(&out_buffer);
-		init_buffer(&err_buffer);
+		init_buffer(&out_buffer, 1 << 12);
+		init_buffer(&err_buffer, 1 << 12);
 
 		for(;;) {
 			int nfds = 0;
@@ -503,7 +503,7 @@ int main(int argc, char *argv[])
 		opt_test = !opt_server;
 	}
 
-	init_buffer(&expanded_input);
+	init_buffer(&expanded_input, 0);
 
 	if (opt_input != -1) {
 		int stdout_dup = -1;
@@ -522,22 +522,22 @@ int main(int argc, char *argv[])
 			usage("command-line arguments missing");
 
 		if (opt_stdin) {
-			struct buffer buffer;
+			struct buffer in_buffer;
 
-			init_buffer(&buffer);
+			init_buffer(&in_buffer, 1 << 12);
 			for(;;) {
 				size_t size;
 
-				grow_buffer(&buffer, 1);
-				size = fread(buffer_write_pos(&buffer), 1, buffer_available(&buffer), stdin);
+				grow_buffer(&in_buffer, 1);
+				size = fread(buffer_write_pos(&in_buffer), 1, buffer_available(&in_buffer), stdin);
 				if (ferror(stdin))
 					fatal("Error reading from standard input");
-				buffer_advance_write(&buffer, size);
+				buffer_advance_write(&in_buffer, size);
 				if (feof(stdin))
 					break;
 			}
-			print_buffer(&buffer, -1);
-			free_buffer(&buffer);
+			print_buffer(&in_buffer, -1);
+			free_buffer(&in_buffer);
 		}
 		fputc('!', stdout);
 		for (; optind < argc; optind++) {
@@ -572,8 +572,8 @@ int main(int argc, char *argv[])
 		if (optind != argc)
 			usage("no command-line arguments allowed");
 
-		init_buffer(&command.output);
-		init_buffer(&command.error);
+		init_buffer(&command.output, 1 << 12);
+		init_buffer(&command.error, 1 << 12);
 
 		for(;;) {
 			if (!parse_output(&command))
@@ -610,7 +610,7 @@ int main(int argc, char *argv[])
 
 		/* server mode */
 
-		init_buffer(&command.input);
+		init_buffer(&command.input, 1 << 12);
 		command.argv = NULL;
 		opt_stdin = false;
 

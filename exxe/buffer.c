@@ -7,20 +7,21 @@ void reset_buffer(struct buffer *buffer)
 	buffer->start = buffer->end = 0;
 }
 
-void init_buffer(struct buffer *buffer)
+void init_buffer(struct buffer *buffer, size_t grow_chunk)
 {
 	buffer->buffer = NULL;
 	buffer->size = 0;
+	buffer->grow_chunk = grow_chunk < 16 ? 16 : grow_chunk;
 	reset_buffer(buffer);
 }
 
 void __grow_buffer(struct buffer *buffer, size_t size)
 {
-	const size_t grow_chunk = 1 << 12, slow_growth_limit = 1 << 20;
+	const size_t slow_growth_limit = 1 << 20;
 	size_t new_size = buffer->size;
 
-	if (size < grow_chunk)
-		size = grow_chunk;
+	if (size < buffer->grow_chunk)
+		size = buffer->grow_chunk;
 	if (new_size && size < slow_growth_limit) {
 		while (new_size - buffer->end < size)
 			new_size <<= 1;
@@ -40,7 +41,7 @@ char *steal_buffer(struct buffer *buffer)
 	char *b;
 
 	b = xrealloc(buffer->buffer, buffer_size(buffer));
-	init_buffer(buffer);
+	init_buffer(buffer, 0);
 	return b;
 }
 

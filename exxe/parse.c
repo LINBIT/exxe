@@ -46,7 +46,7 @@ static bool parse_number(unsigned int *number)
 		unput(c);
 		return false;
 	}
-	init_buffer(&buffer);
+	init_buffer(&buffer, 0);
 	put_buffer(&buffer, c);
 	for(;;) {
 		c = input();
@@ -132,7 +132,7 @@ static void parse_dollar(struct buffer *buffer)
 	case '!': case '?': case '*': case '@': case '-': case '_': case '$':
 		fatal("Parameter '$%c' not supported", c);
 	case '{':
-		init_buffer(&name); /* FIXME: Only start with a small buffer ...  */
+		init_buffer(&name, 0);
 		for(;;) {
 			c = input();
 			if (c == '}')
@@ -148,7 +148,7 @@ static void parse_dollar(struct buffer *buffer)
 	if (c >= '0' && c <= '9')
 		fatal("Parameter '$%c' not supported", c);
 	else if (isname(c)) {
-		init_buffer(&name); /* FIXME: Only start with a small buffer ...  */
+		init_buffer(&name, 0);
 		do {
 			put_buffer(&name, c);
 			c = input();
@@ -282,7 +282,7 @@ static void parse_command(char ***argv)
 		struct buffer buffer;
 		bool more = false;
 
-		init_buffer(&buffer);
+		init_buffer(&buffer, 0);
 		if (!parse_word(&buffer, &more)) {
 			if (*argv)
 				return;

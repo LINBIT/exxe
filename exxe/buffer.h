@@ -4,6 +4,7 @@
 struct buffer {
 	char *buffer;
 	size_t size;
+	size_t grow_chunk;
 	size_t start, end;
 };
 
@@ -12,7 +13,7 @@ char *xstrndup(const char *s, size_t n);
 void *xrealloc(void *buffer, size_t size);
 
 void reset_buffer(struct buffer *buffer);
-void init_buffer(struct buffer *buffer);
+void init_buffer(struct buffer *buffer, size_t grow_chunk);
 
 static inline size_t buffer_available(struct buffer *buffer)
 {
