@@ -31,6 +31,7 @@ static struct option long_options[] = {
 	{"in-from",  required_argument, 0, 'I' },
 	{"out",      no_argument, 0, 'o' },
 	{"out-to",   required_argument, 0, 'O' },
+	{"no-quote", no_argument, 0, 'Q' },
 	{"version",  no_argument, 0, 'v' },
 	{"help",     no_argument, 0, 'h' },
 	{}
@@ -359,9 +360,9 @@ static bool strchrs(const char *any, const char *str)
 	return false;
 }
 
-static void print_arg(const char *arg)
+static void print_arg(const char *arg, bool quote)
 {
-	if (!*arg || strchrs("\\\'\"$ \t\n", arg)) {
+	if (quote && (!*arg || strchrs("\\\'\"$ \t\n", arg))) {
 		bool single_quoted = false;
 
 		if (!*arg ||
@@ -391,8 +392,10 @@ static void print_arg(const char *arg)
 		}
 		if (single_quoted)
 			fputc('\'', stdout);
-	} else
+	} else {
+		/* FIXME: Escape newlines if they are outside quotes! */
 		fputs(arg, stdout);
+	}
 }
 
 static void usage(const char *fmt, ...)
@@ -413,16 +416,18 @@ static void usage(const char *fmt, ...)
 "    Act as a server: execute commands read from standard input, and report\n"
 "    the results on standard output.\n"
 "\n"
-"  " PACKAGE_NAME " -i [-n] {command} ...\n"
+"  " PACKAGE_NAME " [-nQ] -i {command} ...\n"
 "    Produce the input the server expects for running {command}.  By default,\n"
-"    the standard input is passed on to the server; the -n option can be used\n"
-"    to prevent that.  Can be run multiple times to send multiple commands\n"
-"    to a server.\n"
+"    the standard input is passed on to the server, and the command and its\n"
+"    arguments are protected from word splitting or environment variable\n"
+"    interpolation.  Use the -n option to not pass standard input on to the\n"
+"    server, and the -Q option to perform environment variable interpolation\n"
+"    and word splitting on the server.\n"
 "\n"
 "  " PACKAGE_NAME " -o\n"
 "    Read and process the server's output: produce the same output as the\n"
 "    command executed by the server, and terminate with the same exit status\n"
-"    or signal.  Can be rerun to read the output of the next command.\n"
+"    or signal.\n"
 "\n"
 "  " PACKAGE_NAME " [-n] {command}\n"
 "    Execute {command} directly, but produce the same output that the\n"
@@ -454,14 +459,14 @@ int main(int argc, char *argv[])
 {
 	int opt_input = -1, opt_output = -1;
 	int opt_server = false, opt_test = false;
-	bool opt_stdin = true;
+	bool opt_stdin = true, opt_quote = true;
 
 	progname = basename(argv[0]);
 
 	for(;;) {
 		int c;
 
-		c = getopt_long(argc, argv, "+niI:oO:vh", long_options, NULL);
+		c = getopt_long(argc, argv, "+niI:oO:Qvh", long_options, NULL);
 		if (c == -1)
 			break;
 
@@ -479,6 +484,9 @@ int main(int argc, char *argv[])
 		case 'O':
 			/* read from standard input by default */
 			opt_output = optarg ? use_fd_or_open_file(optarg, O_RDONLY) : 0;
+			break;
+		case 'Q':
+			opt_quote = false;
 			break;
 		case 'n':
 			/* Redirect standard input to /dev/null.  Only
@@ -542,7 +550,7 @@ int main(int argc, char *argv[])
 		fputc('!', stdout);
 		for (; optind < argc; optind++) {
 			fputc(' ', stdout);
-			print_arg(argv[optind]);
+			print_arg(argv[optind], opt_quote);
 		}
 		fputc('\n', stdout);
 		if (fflush(stdout) != 0)

@@ -97,3 +97,7 @@ check "echo -e \"! export SQ=\\\"'  '\\\"\\n! echo \\\$SQ\\n! echo \\\"+\\\$SQ+\
 > +'  '+
 ? 0
 EOF
+
+check 'exxe -Qi export PATH=\".:\$PATH\"' <<EOF
+! export PATH=".:\$PATH"
+EOF
