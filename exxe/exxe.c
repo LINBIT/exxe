@@ -240,7 +240,7 @@ int run_command(const char *file, char *argv[], struct buffer *in_buffer, int fl
 	int ret;
 
 	if (do_internal(argv, in_buffer))
-		return 0;
+		goto out;
 
 	if (in_buffer) {
 		ret = pipe2(in, O_CLOEXEC);
@@ -335,7 +335,6 @@ int run_command(const char *file, char *argv[], struct buffer *in_buffer, int fl
 			printf("$ %u %s\n", WTERMSIG(status), strsignal(WTERMSIG(status)));
 		else
 			printf("?\n");
-		fflush(stdout);
 
 		free_buffer(&out_buffer);
 		free_buffer(&err_buffer);
@@ -349,6 +348,8 @@ int run_command(const char *file, char *argv[], struct buffer *in_buffer, int fl
 		fprintf(stderr, "%s: %s\n", file, strerror(errno));
 		exit(127);
 	}
+out:
+	fflush(stdout);
 	return 0;
 }
 
