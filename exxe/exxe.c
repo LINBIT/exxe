@@ -502,7 +502,7 @@ int main(int argc, char *argv[])
 		case 'h':
 			usage(NULL);
 		case '?':
-			break;
+			exit(2);
 		};
 	}
 
