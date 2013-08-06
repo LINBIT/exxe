@@ -1,0 +1,17 @@
+#! /bin/sh
+
+. $srcdir/test-lib.sh
+use_local_exxe
+use_tmpdir
+
+check 'echo -e "> foo\\n> foo2\\n2> bar\\n? 0" | exxe -o --prefix=">> "' <<EOF
+>> foo
+>> foo2
+>> bar
+EOF
+
+check 'echo -e "> foo\\n> foo2\\n2> bar\\n? 0" | exxe -o --error-prefix=">> "' <<EOF
+foo
+foo2
+>> bar
+EOF

@@ -1,3 +1,4 @@
 * man page
 * Timeout for commands
 * Document the syntax
+* Allow to define a cleanup action?

@@ -1,5 +1,6 @@
 TESTS = \
 	all \
+	prefix \
 	quoting_and_variables
 
 EXTRA_DIST = \

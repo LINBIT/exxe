@@ -31,6 +31,8 @@ static struct option long_options[] = {
 	{"in-from",  required_argument, 0, 'I' },
 	{"out",      no_argument, 0, 'o' },
 	{"out-to",   required_argument, 0, 'O' },
+	{"prefix",   required_argument, 0, 'p' },
+	{"error-prefix", required_argument, 0, 'P' },
 	{"no-quote", no_argument, 0, 'Q' },
 	{"version",  no_argument, 0, 'v' },
 	{"help",     no_argument, 0, 'h' },
@@ -125,6 +127,27 @@ static int write_to(int *pfd, struct buffer *buffer, const char *which)
 	}
 
 	return 0;
+}
+
+static void write_output(struct buffer *buffer, FILE *file, const char *prefix)
+{
+	const char *text = buffer_read_pos(buffer);
+	size_t size = buffer_size(buffer);
+
+	if (prefix) {
+		while (size) {
+			char *nl = memchr(text, '\n', size);
+			size_t len = nl ? nl - text + 1 : size;
+
+			fputs(prefix, file);
+			fwrite(text, 1, len, file);
+			text += len;
+			size -= len;
+		}
+	} else
+		fwrite(text, 1, size, file);
+	fflush(file);
+	reset_buffer(buffer);
 }
 
 static void print_errno_error(const char *command)
@@ -425,10 +448,11 @@ static void usage(const char *fmt, ...)
 "    server, and the -Q option to perform environment variable interpolation\n"
 "    and word splitting on the server.\n"
 "\n"
-"  " PACKAGE_NAME " -o\n"
+"  " PACKAGE_NAME " [--prefix=...] [--error-prefix=...] -o\n"
 "    Read and process the server's output: produce the same output as the\n"
 "    command executed by the server, and terminate with the same exit status\n"
-"    or signal.\n"
+"    or signal.  A prefix for each line of output (for all output or only for\n"
+"    error output) can be specified.\n"
 "\n"
 "  " PACKAGE_NAME " [-n] {command}\n"
 "    Execute {command} directly, but produce the same output that the\n"
@@ -461,6 +485,7 @@ int main(int argc, char *argv[])
 	int opt_input = -1, opt_output = -1;
 	int opt_server = false, opt_test = false;
 	bool opt_stdin = true, opt_quote = true;
+	const char *opt_prefix = NULL, *opt_error_prefix = NULL;
 
 	progname = basename(argv[0]);
 
@@ -486,6 +511,12 @@ int main(int argc, char *argv[])
 			/* read from standard input by default */
 			opt_output = optarg ? use_fd_or_open_file(optarg, O_RDONLY) : 0;
 			break;
+		case 'p':
+			opt_prefix = optarg;
+			break;
+		case 'P':
+			opt_error_prefix = optarg;
+			break;
 		case 'Q':
 			opt_quote = false;
 			break;
@@ -506,6 +537,9 @@ int main(int argc, char *argv[])
 			exit(2);
 		};
 	}
+
+	if (opt_prefix && !opt_error_prefix)
+		opt_error_prefix = opt_prefix;
 
 	if (opt_input == -1 && opt_output == -1) {
 		opt_server = optind == argc;
@@ -589,14 +623,10 @@ int main(int argc, char *argv[])
 				fatal("Unexpected EOF while reading the command output");
 			switch(command.command) {
 			case '1':
-				fwrite(buffer_read_pos(&command.output), 1,
-				       buffer_size(&command.output), stdout);
-				reset_buffer(&command.output);
+				write_output(&command.output, stdout, opt_prefix);
 				break;
 			case '2':
-				fwrite(buffer_read_pos(&command.error), 1,
-				       buffer_size(&command.error), stderr);
-				reset_buffer(&command.error);
+				write_output(&command.error, stderr, opt_error_prefix);
 				break;
 			case '?':
 				exit(command.status);
