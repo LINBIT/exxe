@@ -1,5 +1,6 @@
 TESTS = \
 	all \
+	onexit \
 	prefix \
 	quoting_and_variables
 

@@ -223,6 +223,52 @@ static int do_umask(char *argv[], struct buffer *in_buffer)
 	return 0;
 }
 
+struct {
+	struct buffer in_buffer;
+	char **argv;
+} onexit;
+
+static int do_onexit(char *argv[], struct buffer *in_buffer)
+{
+	int argc;
+
+	if (!argv[1]) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	if (onexit.argv) {
+		for (argc = 0; onexit.argv[argc]; argc++)
+			free(onexit.argv[argc]);
+	}
+
+	if (!strcmp(argv[1], "-")) {
+		free(onexit.argv);
+		onexit.argv = NULL;
+	} else {
+		for (argc = 1; argv[argc]; argc++)
+			/* do nothing */ ;
+		onexit.argv = xrealloc(onexit.argv,
+			(argc + 1) * sizeof(onexit.argv[0]));
+		for (argc = 1; argv[argc]; argc++)
+			onexit.argv[argc - 1] = xstrdup(argv[argc]);
+		onexit.argv[argc - 1] = NULL;
+
+		reset_buffer(&onexit.in_buffer);
+		if (in_buffer && buffer_size(in_buffer)) {
+			size_t size;
+
+			size = buffer_size(in_buffer);
+			grow_buffer(&onexit.in_buffer, size);
+			memcpy(buffer_write_pos(&onexit.in_buffer),
+			       buffer_read_pos(in_buffer), size);
+			buffer_advance_write(&onexit.in_buffer, size);
+			buffer_advance_read(in_buffer, size);
+		}
+	}
+	return 0;
+}
+
 struct internal_command {
 	const char *name;
 	int (*command)(char *argv[], struct buffer *in_buffer);
@@ -232,6 +278,7 @@ struct internal_command internal_commands[] = {
 	{"cd", do_chdir},
 	{"export", do_export},
 	{"umask", do_umask},
+	{"onexit", do_onexit},
 	{}
 };
 
@@ -547,6 +594,8 @@ int main(int argc, char *argv[])
 	}
 
 	init_buffer(&expanded_input, 0);
+	init_buffer(&onexit.in_buffer, 0);
+	onexit.argv = NULL;
 
 	if (opt_input != -1) {
 		int stdout_dup = -1;
@@ -686,5 +735,8 @@ int main(int argc, char *argv[])
 		args[n - optind] = NULL;
 		run_command(args, NULL, opt_stdin ? WITH_STDIN : 0);
 	}
+
+	if (onexit.argv)
+		run_command(onexit.argv, &onexit.in_buffer, 0);
 	return 0;
 }

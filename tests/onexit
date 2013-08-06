@@ -1,0 +1,26 @@
+#! /bin/sh
+
+. $srcdir/test-lib.sh
+use_local_exxe
+use_tmpdir
+
+check 'exxe onexit echo foo' <<EOF
+? 0
+> foo
+? 0
+EOF
+
+check 'exxe onexit -' <<EOF
+? 0
+EOF
+
+check '(echo "> foo"; echo "! onexit cat") | exxe' <<EOF
+? 0
+> foo
+? 0
+EOF
+
+check '(echo "! onexit echo foo"; echo "! onexit -") | exxe' <<EOF
+? 0
+? 0
+EOF
