@@ -265,7 +265,7 @@ int run_command(char *argv[], struct buffer *in_buffer, int flags)
 	if (do_internal(argv, in_buffer))
 		goto out;
 
-	if (in_buffer) {
+	if (in_buffer && buffer_size(in_buffer)) {
 		ret = pipe2(in, O_CLOEXEC);
 		if (ret != 0)
 			return -1;
