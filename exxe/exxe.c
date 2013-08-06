@@ -255,7 +255,7 @@ static bool do_internal(char *argv[], struct buffer *in_buffer)
 	return false;
 }
 
-int run_command(const char *file, char *argv[], struct buffer *in_buffer, int flags)
+int run_command(char *argv[], struct buffer *in_buffer, int flags)
 {
 	static int dev_null = -1;
 	pid_t pid;
@@ -367,8 +367,8 @@ int run_command(const char *file, char *argv[], struct buffer *in_buffer, int fl
 			dup2(in[0] == -1 ? dev_null : in[0], 0);
 		dup2(out[1], 1);
 		dup2(err[1], 2);
-		execvp(file, argv);
-		fprintf(stderr, "%s: %s\n", file, strerror(errno));
+		execvp(argv[0], argv);
+		fprintf(stderr, "%s: %s\n", argv[0], strerror(errno));
 		exit(127);
 	}
 out:
@@ -660,7 +660,7 @@ int main(int argc, char *argv[])
 			case '>':
 				break;
 			case '!':
-				run_command(command.argv[0], command.argv, &command.input, 0);
+				run_command(command.argv, &command.input, 0);
 				reset_buffer(&command.input);
 				free_argv(command.argv);
 				command.argv = NULL;
@@ -684,7 +684,7 @@ int main(int argc, char *argv[])
 		for (n = optind; n < argc; n++)
 			args[n - optind] = argv[n];
 		args[n - optind] = NULL;
-		run_command(args[0], args, NULL, opt_stdin ? WITH_STDIN : 0);
+		run_command(args, NULL, opt_stdin ? WITH_STDIN : 0);
 	}
 	return 0;
 }
