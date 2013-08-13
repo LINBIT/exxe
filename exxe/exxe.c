@@ -349,7 +349,7 @@ static void set_signals(void)
 		fatal("setting SIGCHLD signal");
 }
 
-int run_command(char *argv[], struct buffer *in_buffer, int flags)
+static void run_command(char *argv[], struct buffer *in_buffer, int flags)
 {
 	static int dev_null = -1;
 	pid_t pid;
@@ -363,17 +363,17 @@ int run_command(char *argv[], struct buffer *in_buffer, int flags)
 	if (in_buffer && buffer_size(in_buffer)) {
 		ret = pipe2(in, O_CLOEXEC);
 		if (ret != 0)
-			return -1;
+			fatal("creating pipe");
 	} else {
 		in[0] = -1;
 		in[1] = -1;
 	}
 	ret = pipe2(out, O_CLOEXEC);
 	if (ret != 0)
-		return -1;
+		fatal("creating pipe");
 	ret = pipe2(err, O_CLOEXEC);
 	if (ret != 0)
-		return -1;
+		fatal("creating pipe");
 
 	if (!in_buffer && !(flags & WITH_STDIN) && dev_null == -1) {
 		dev_null = open("/dev/null", O_RDONLY);
@@ -438,10 +438,8 @@ int run_command(char *argv[], struct buffer *in_buffer, int flags)
 
 			ret = pselect(nfds, &rfds, &wfds, NULL, ptimeout, &empty_mask);
 			if (ret == -1) {
-				if (errno != EINTR) {
-					perror("running command");
-					return -1;
-				}
+				if (errno != EINTR)
+					fatal("waiting for command");
 			} else if (ret == 0) {
 				switch(killed_by) {
 				case 0:
@@ -477,7 +475,7 @@ int run_command(char *argv[], struct buffer *in_buffer, int flags)
 		for(;;) {
 			ret = waitpid(pid, &status, 0);
 			if (ret != pid)
-				return -1;
+				fatal("waiting for command");
 			if (!(WIFSTOPPED(status) || WIFCONTINUED(status)))
 				break;
 		}
@@ -503,7 +501,6 @@ out:
 	} else
 		printf("?\n");
 	fflush(stdout);
-	return 0;
 }
 
 static bool strchrs(const char *any, const char *str)
