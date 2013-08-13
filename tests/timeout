@@ -1,0 +1,21 @@
+#! /bin/sh
+
+. $srcdir/test-lib.sh
+use_local_exxe
+use_tmpdir
+
+check '(echo "! timeout"; echo "! timeout 0.1"; echo "! timeout"; echo "! timeout 0"; echo "! timeout") | exxe' <<EOF
+> 0
+? 0
+? 0
+> 0.1
+? 0
+? 0
+> 0
+? 0
+EOF
+
+check '(echo "! timeout 0.1"; echo "! sleep 1") | exxe' <<EOF
+? 0
+$ 15 Timeout
+EOF

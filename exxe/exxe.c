@@ -9,6 +9,7 @@
 #include <errno.h>
 #include <string.h>
 #include <fcntl.h>
+#include <math.h>
 #include <sys/select.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -248,6 +249,28 @@ static int do_onexit(char *argv[], struct buffer *in_buffer)
 	return 0;
 }
 
+struct timespec timeout;
+
+static int do_timeout(char *argv[], struct buffer *in_buffer)
+{
+	double t, frac;
+	char *end;
+
+	if (!argv[1]) {
+		printf("> %g\n", timeout.tv_sec + timeout.tv_nsec * 1e-9);
+		return 0;
+	}
+	t = strtod(argv[1], &end);
+	if (*end || t < 0) {
+		errno = EINVAL;
+		return -1;
+	}
+	frac = modf(t, &t);
+	timeout.tv_sec = floor(t);
+	timeout.tv_nsec = floor(frac * 1e9);
+	return 0;
+}
+
 static int do_umask(char *argv[], struct buffer *in_buffer)
 {
 	unsigned long mask;
@@ -278,6 +301,7 @@ struct internal_command internal_commands[] = {
 	{"cd", do_chdir},
 	{"export", do_export},
 	{"onexit", do_onexit},
+	{"timeout", do_timeout},
 	{"umask", do_umask},
 	{}
 };
@@ -300,6 +324,30 @@ static bool do_internal(char *argv[], struct buffer *in_buffer)
 		}
 	}
 	return false;
+}
+
+static volatile sig_atomic_t got_child_sig;
+
+static void child_sig_handler(int sig)
+{
+	got_child_sig = 1;
+}
+
+static void set_signals(void)
+{
+	sigset_t sigmask;
+	struct sigaction sa;
+
+	sigemptyset(&sigmask);
+	sigaddset(&sigmask, SIGCHLD);
+	if (sigprocmask(SIG_BLOCK, &sigmask, NULL))
+		fatal("blocking SIGCHLD signal");
+
+	sa.sa_flags = 0;
+	sa.sa_handler = child_sig_handler;
+	sigemptyset(&sa.sa_mask);
+	if (sigaction(SIGCHLD, &sa, NULL))
+		fatal("setting SIGCHLD signal");
 }
 
 int run_command(char *argv[], struct buffer *in_buffer, int flags)
@@ -335,10 +383,16 @@ int run_command(char *argv[], struct buffer *in_buffer, int flags)
 		}
 	}
 
+	got_child_sig = 0;
+
 	pid = fork();
 	if (pid) {
 		struct buffer out_buffer, err_buffer;
+		int killed_by = 0;
+		sigset_t empty_mask;
 		int status;
+
+		sigemptyset(&empty_mask);
 
 		if (in[0] != -1)
 			close(in[0]);
@@ -355,6 +409,7 @@ int run_command(char *argv[], struct buffer *in_buffer, int flags)
 
 		for(;;) {
 			int nfds = 0;
+			struct timespec tmp, *ptimeout;
 
 			fd_set rfds, wfds;
 
@@ -372,14 +427,41 @@ int run_command(char *argv[], struct buffer *in_buffer, int flags)
 				FD_SET(in[1], &wfds);
 				nfds = max(nfds, in[1]) + 1;
 			}
-			if (nfds == 0)
+			if (nfds == 0 && got_child_sig)
 				break;
-			ret = select(nfds, &rfds, &wfds, NULL, NULL);
-			if (ret == -1) {
-				perror("running command");
-				return -1;
+
+			if (killed_by == SIGKILL ||
+			    (timeout.tv_sec == 0 && timeout.tv_nsec == 0))
+				ptimeout = NULL;
+			else {
+				tmp = timeout;
+				ptimeout = &tmp;
 			}
-			if (ret) {
+
+			ret = pselect(nfds, &rfds, &wfds, NULL, ptimeout, &empty_mask);
+			if (ret == -1) {
+				if (errno != EINTR) {
+					perror("running command");
+					return -1;
+				}
+			} else if (ret == 0) {
+				switch(killed_by) {
+				case 0:
+					/* Allow the command to terminate in a
+					   controlled way.  */
+					killed_by = SIGTERM;
+					kill(pid, killed_by);
+					break;
+				case SIGTERM:
+					/* The command didn't react; use force
+					   and kill the entire process group.  */
+					killed_by = SIGKILL;
+					killpg(pid, killed_by);
+					break;
+				case SIGKILL:
+					break;
+				}
+			} else {
 				if (FD_ISSET(in[1], &wfds))
 					write_to(&in[1], in_buffer, "standard input");
 				if (FD_ISSET(out[0], &rfds))
@@ -399,11 +481,16 @@ int run_command(char *argv[], struct buffer *in_buffer, int flags)
 			if (!(WIFSTOPPED(status) || WIFCONTINUED(status)))
 				break;
 		}
-		if (WIFEXITED(status))
+
+		if (killed_by)
+			printf("$ %u Timeout\n", killed_by);
+		else if (WIFEXITED(status))
 			printf("? %d\n", WEXITSTATUS(status));
-		else if (WIFSIGNALED(status))
-			printf("$ %u %s\n", WTERMSIG(status), strsignal(WTERMSIG(status)));
-		else
+		else if (WIFSIGNALED(status)) {
+			printf("$ %u %s\n",
+			       WTERMSIG(status),
+			       strsignal(WTERMSIG(status)));
+		} else
 			printf("?\n");
 
 		free_buffer(&out_buffer);
@@ -698,6 +785,7 @@ int main(int argc, char *argv[])
 
 		/* server mode */
 
+		set_signals();
 		init_buffer(&command.input, 1 << 12);
 		command.argv = NULL;
 		opt_stdin = false;
@@ -720,15 +808,12 @@ int main(int argc, char *argv[])
 		free_argv(command.argv);
 	}
 	if (opt_test) {
-
-		/* test mode */
-
 		char *args[argc - optind + 1];
 		int n;
 
-		if (optind == argc)
-			usage("no command specified");
+		/* test mode */
 
+		set_signals();
 		setlocale(LC_CTYPE, NULL);
 		for (n = optind; n < argc; n++)
 			args[n - optind] = argv[n];
@@ -738,5 +823,6 @@ int main(int argc, char *argv[])
 
 	if (onexit.argv)
 		run_command(onexit.argv, &onexit.in_buffer, 0);
+
 	return 0;
 }

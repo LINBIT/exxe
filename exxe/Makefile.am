@@ -10,3 +10,6 @@ exxe_SOURCES = \
 	parse.h \
 	xalloc.c \
 	xalloc.h
+exxe_LDADD = -lm
+
+AM_CFLAGS = -Wall

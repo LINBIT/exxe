@@ -2,7 +2,8 @@ TESTS = \
 	all \
 	onexit \
 	prefix \
-	quoting_and_variables
+	quoting_and_variables \
+	timeout
 
 EXTRA_DIST = \
 	$(TESTS) \
