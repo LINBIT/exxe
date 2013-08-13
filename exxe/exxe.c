@@ -18,6 +18,7 @@
 #include <locale.h>
 #include <getopt.h>
 #include <stdarg.h>
+#include <syslog.h>
 
 #include "xalloc.h"
 #include "buffer.h"
@@ -35,6 +36,7 @@ static struct option long_options[] = {
 	{"prefix",   required_argument, 0, 'p' },
 	{"error-prefix", required_argument, 0, 'P' },
 	{"no-quote", no_argument, 0, 'Q' },
+	{"syslog",   no_argument, 0, 's' },
 	{"version",  no_argument, 0, 'v' },
 	{"help",     no_argument, 0, 'h' },
 	{}
@@ -42,7 +44,7 @@ static struct option long_options[] = {
 
 const char *progname;
 
-enum { WITH_STDIN = 1 };
+enum { WITH_STDIN = 1, WITH_SYSLOG = 2 };
 
 static bool is_printable(const char *s, size_t len)
 {
@@ -356,6 +358,33 @@ static void run_command(char *argv[], struct buffer *in_buffer, int flags)
 	int in[2], out[2], err[2];
 	int killed_by = 0, status, ret;
 
+	if (flags & WITH_SYSLOG) {
+		static const char *ident;
+
+		char **argp, *str, *s;
+
+		s = getenv("EXXE_IDENT");
+		if (!ident || !s || strcmp(s, ident)) {
+			ident = (s && *s) ? s : progname;
+			closelog();
+			openlog(ident, 0, LOG_USER);
+		}
+
+		for (argp = argv, s = NULL; *argp; argp++)
+			s += strlen(*argp) + 1;
+		str = xalloc(s - (char *)NULL + 1);
+		for (argp = argv, s = str; *argp; argp++) {
+			size_t len = strlen(*argp);
+
+			memcpy(s, *argp, len);
+			s += len;
+			*s++ = ' ';
+		}
+		*(--s) = 0;
+		syslog(LOG_USER | LOG_INFO, "%s", str);
+		free(str);
+	}
+
 	status = do_internal(argv, in_buffer);
 	if (status != -1)
 		goto out;
@@ -501,6 +530,26 @@ out:
 	} else
 		printf("?\n");
 	fflush(stdout);
+
+	if (flags & WITH_SYSLOG) {
+		if (killed_by)
+			syslog(LOG_USER | LOG_INFO,
+			       "%s has timed out",
+			       argv[0]);
+		else if (WIFEXITED(status)) {
+			if (WEXITSTATUS(status))
+				syslog(LOG_USER | LOG_INFO,
+				       "%s has exited with status %d",
+				       argv[0],
+				       WEXITSTATUS(status));
+		} else if (WIFSIGNALED(status)) {
+			syslog(LOG_USER | LOG_INFO,
+			       "%s was killed by signal %u (%s)",
+			       argv[0],
+			       WTERMSIG(status),
+			       strsignal(WTERMSIG(status)));
+		}
+	}
 }
 
 static bool strchrs(const char *any, const char *str)
@@ -565,7 +614,8 @@ static void usage(const char *fmt, ...)
 "\n"
 "  " PACKAGE_NAME "\n"
 "    Act as a server: execute commands read from standard input, and report\n"
-"    the results on standard output.\n"
+"    the results on standard output.  With the --syslog option, all commands\n"
+"    are logged.\n"
 "\n"
 "  " PACKAGE_NAME " [-nQ] -i {command} ...\n"
 "    Produce the input the server expects for running {command}.  By default,\n"
@@ -584,7 +634,8 @@ static void usage(const char *fmt, ...)
 "  " PACKAGE_NAME " [-n] {command}\n"
 "    Execute {command} directly, but produce the same output that the\n"
 "    utility would produce in server mode.  The -n option can be used to\n"
-"    prevent the utility from reading from standard input.\n"
+"    prevent the utility from reading from standard input.  With the --syslog\n"
+"    option, the command is logged.\n"
 "\n"
 "The following is roughly equivalent to running {command} directly:\n"
 "  " PACKAGE_NAME " [-n] -i {command} | " PACKAGE_NAME " | " PACKAGE_NAME " -o\n", fmt ? stdout : stderr);
@@ -655,6 +706,9 @@ int main(int argc, char *argv[])
 			 * exxe's standard input.  */
 			flags &= ~WITH_STDIN;
 			break;
+		case 's':
+			flags |= WITH_SYSLOG;
+			break;
 		case 'v':
 			printf("%s %s\n", PACKAGE_NAME, PACKAGE_VERSION);
 			exit(0);
@@ -677,6 +731,9 @@ int main(int argc, char *argv[])
 	init_buffer(&expanded_input, 0);
 	init_buffer(&onexit.in_buffer, 0);
 	onexit.argv = NULL;
+
+	if (flags & WITH_SYSLOG)
+		openlog(progname, 0, LOG_USER);
 
 	if (opt_input != -1) {
 		int stdout_dup = -1;
