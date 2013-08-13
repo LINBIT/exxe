@@ -611,8 +611,9 @@ int main(int argc, char *argv[])
 {
 	int opt_input = -1, opt_output = -1;
 	int opt_server = false, opt_test = false;
-	bool opt_stdin = true, opt_quote = true;
+	bool opt_quote = true;
 	const char *opt_prefix = NULL, *opt_error_prefix = NULL;
+	int flags = WITH_STDIN;
 
 	progname = basename(argv[0]);
 
@@ -652,7 +653,7 @@ int main(int argc, char *argv[])
 			 * effective when passing the command to run on the
 			 * command line; otherwise, we never read from
 			 * exxe's standard input.  */
-			opt_stdin = false;
+			flags &= ~WITH_STDIN;
 			break;
 		case 'v':
 			printf("%s %s\n", PACKAGE_NAME, PACKAGE_VERSION);
@@ -693,7 +694,7 @@ int main(int argc, char *argv[])
 		if (optind == argc)
 			usage("command-line arguments missing");
 
-		if (opt_stdin) {
+		if (flags & WITH_STDIN) {
 			struct buffer in_buffer;
 
 			init_buffer(&in_buffer, 1 << 12);
@@ -781,7 +782,7 @@ int main(int argc, char *argv[])
 		set_signals();
 		init_buffer(&command.input, 1 << 12);
 		command.argv = NULL;
-		opt_stdin = false;
+		flags &= ~WITH_STDIN;
 
 		for(;;) {
 			if (!parse_input(&command))
@@ -790,7 +791,7 @@ int main(int argc, char *argv[])
 			case '>':
 				break;
 			case '!':
-				run_command(command.argv, &command.input, 0);
+				run_command(command.argv, &command.input, flags);
 				reset_buffer(&command.input);
 				free_argv(command.argv);
 				command.argv = NULL;
@@ -811,11 +812,11 @@ int main(int argc, char *argv[])
 		for (n = optind; n < argc; n++)
 			args[n - optind] = argv[n];
 		args[n - optind] = NULL;
-		run_command(args, NULL, opt_stdin ? WITH_STDIN : 0);
+		run_command(args, NULL, flags);
 	}
 
 	if (onexit.argv)
-		run_command(onexit.argv, &onexit.in_buffer, 0);
+		run_command(onexit.argv, &onexit.in_buffer, flags);
 
 	return 0;
 }
