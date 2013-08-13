@@ -306,7 +306,7 @@ struct internal_command internal_commands[] = {
 	{}
 };
 
-static bool do_internal(char *argv[], struct buffer *in_buffer)
+static int do_internal(char *argv[], struct buffer *in_buffer)
 {
 	struct internal_command *command;
 
@@ -319,11 +319,10 @@ static bool do_internal(char *argv[], struct buffer *in_buffer)
 				print_errno_error(argv[0]);
 				ret = 1;
 			}
-			printf("? %d\n", ret);
-			return true;
+			return W_EXITCODE(ret, 0);
 		}
 	}
-	return false;
+	return -1;
 }
 
 static volatile sig_atomic_t got_child_sig;
@@ -355,9 +354,10 @@ int run_command(char *argv[], struct buffer *in_buffer, int flags)
 	static int dev_null = -1;
 	pid_t pid;
 	int in[2], out[2], err[2];
-	int ret;
+	int killed_by = 0, status, ret;
 
-	if (do_internal(argv, in_buffer))
+	status = do_internal(argv, in_buffer);
+	if (status != -1)
 		goto out;
 
 	if (in_buffer && buffer_size(in_buffer)) {
@@ -388,9 +388,7 @@ int run_command(char *argv[], struct buffer *in_buffer, int flags)
 	pid = fork();
 	if (pid) {
 		struct buffer out_buffer, err_buffer;
-		int killed_by = 0;
 		sigset_t empty_mask;
-		int status;
 
 		sigemptyset(&empty_mask);
 
@@ -472,7 +470,9 @@ int run_command(char *argv[], struct buffer *in_buffer, int flags)
 		}
 
 		print_buffer(&out_buffer, -1);
+		free_buffer(&out_buffer);
 		print_buffer(&err_buffer, 2);
+		free_buffer(&err_buffer);
 
 		for(;;) {
 			ret = waitpid(pid, &status, 0);
@@ -481,20 +481,6 @@ int run_command(char *argv[], struct buffer *in_buffer, int flags)
 			if (!(WIFSTOPPED(status) || WIFCONTINUED(status)))
 				break;
 		}
-
-		if (killed_by)
-			printf("$ %u Timeout\n", killed_by);
-		else if (WIFEXITED(status))
-			printf("? %d\n", WEXITSTATUS(status));
-		else if (WIFSIGNALED(status)) {
-			printf("$ %u %s\n",
-			       WTERMSIG(status),
-			       strsignal(WTERMSIG(status)));
-		} else
-			printf("?\n");
-
-		free_buffer(&out_buffer);
-		free_buffer(&err_buffer);
 	} else {
 		setpgrp();
 		if (!(flags & WITH_STDIN))
@@ -506,6 +492,16 @@ int run_command(char *argv[], struct buffer *in_buffer, int flags)
 		exit(127);
 	}
 out:
+	if (killed_by)
+		printf("$ %u Timeout\n", killed_by);
+	else if (WIFEXITED(status))
+		printf("? %d\n", WEXITSTATUS(status));
+	else if (WIFSIGNALED(status)) {
+		printf("$ %u %s\n",
+		       WTERMSIG(status),
+		       strsignal(WTERMSIG(status)));
+	} else
+		printf("?\n");
 	fflush(stdout);
 	return 0;
 }
