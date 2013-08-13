@@ -202,27 +202,6 @@ static int do_export(char *argv[], struct buffer *in_buffer)
 	return 0;
 }
 
-static int do_umask(char *argv[], struct buffer *in_buffer)
-{
-	unsigned long mask;
-	char *end;
-
-	if (!argv[1]) {
-		int mask;
-
-		mask = umask(0); umask(mask);
-		printf("> %04o\n", mask);
-		return 0;
-	}
-	mask = strtoul(argv[1], &end, 8);
-	if (*end || mask > 0777) {
-		errno = EINVAL;
-		return -1;
-	}
-	umask(mask);
-	return 0;
-}
-
 struct {
 	struct buffer in_buffer;
 	char **argv;
@@ -269,6 +248,27 @@ static int do_onexit(char *argv[], struct buffer *in_buffer)
 	return 0;
 }
 
+static int do_umask(char *argv[], struct buffer *in_buffer)
+{
+	unsigned long mask;
+	char *end;
+
+	if (!argv[1]) {
+		int mask;
+
+		mask = umask(0); umask(mask);
+		printf("> %04o\n", mask);
+		return 0;
+	}
+	mask = strtoul(argv[1], &end, 8);
+	if (*end || mask > 0777) {
+		errno = EINVAL;
+		return -1;
+	}
+	umask(mask);
+	return 0;
+}
+
 struct internal_command {
 	const char *name;
 	int (*command)(char *argv[], struct buffer *in_buffer);
@@ -277,8 +277,8 @@ struct internal_command {
 struct internal_command internal_commands[] = {
 	{"cd", do_chdir},
 	{"export", do_export},
-	{"umask", do_umask},
 	{"onexit", do_onexit},
+	{"umask", do_umask},
 	{}
 };
 
