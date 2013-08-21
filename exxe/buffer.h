@@ -1,16 +1,14 @@
 #ifndef __BUFFER_H
 #define __BUFFER_H
 
+#include "xalloc.h"
+
 struct buffer {
 	char *buffer;
 	size_t size;
 	size_t grow_chunk;
 	size_t start, end;
 };
-
-void *xalloc(size_t size);
-char *xstrndup(const char *s, size_t n);
-void *xrealloc(void *buffer, size_t size);
 
 void reset_buffer(struct buffer *buffer);
 void init_buffer(struct buffer *buffer, size_t grow_chunk);
