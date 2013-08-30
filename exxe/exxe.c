@@ -28,13 +28,13 @@
 #define max(a, b) (((a) > (b)) ? (a) : (b))
 
 static struct option long_options[] = {
-	{"no-stdin", no_argument, 0, 'n' },
+	{"stdin", no_argument, 0, 'p' },
 	{"in",       no_argument, 0, 'i' },
 	{"in-from",  required_argument, 0, 'I' },
 	{"out",      no_argument, 0, 'o' },
 	{"out-to",   required_argument, 0, 'O' },
-	{"prefix",   required_argument, 0, 'p' },
-	{"error-prefix", required_argument, 0, 'P' },
+	{"prefix",   required_argument, 0, 1 },
+	{"error-prefix", required_argument, 0, 2 },
 	{"no-quote", no_argument, 0, 'Q' },
 	{"syslog",   no_argument, 0, 's' },
 	{"version",  no_argument, 0, 'v' },
@@ -617,11 +617,11 @@ static void usage(const char *fmt, ...)
 "    the results on standard output.  With the --syslog option, all commands\n"
 "    are logged.\n"
 "\n"
-"  " PACKAGE_NAME " [-nQ] -i {command} ...\n"
+"  " PACKAGE_NAME " [-pQ] -i {command} ...\n"
 "    Produce the input the server expects for running {command}.  By default,\n"
-"    the standard input is passed on to the server, and the command and its\n"
-"    arguments are protected from word splitting or environment variable\n"
-"    interpolation.  Use the -n option to not pass standard input on to the\n"
+"    the standard input is not passed on to the server, and the command and\n"
+"    its arguments are protected from word splitting or environment variable\n"
+"    interpolation.  Use the -p option to pass standard input on to the\n"
 "    server, and the -Q option to perform environment variable interpolation\n"
 "    and word splitting on the server.\n"
 "\n"
@@ -631,14 +631,14 @@ static void usage(const char *fmt, ...)
 "    or signal.  A prefix for each line of output (for all output or only for\n"
 "    error output) can be specified.\n"
 "\n"
-"  " PACKAGE_NAME " [-n] {command}\n"
+"  " PACKAGE_NAME " [-p] {command}\n"
 "    Execute {command} directly, but produce the same output that the\n"
-"    utility would produce in server mode.  The -n option can be used to\n"
-"    prevent the utility from reading from standard input.  With the --syslog\n"
+"    utility would produce in server mode.  The -p option can be used to\n"
+"    allow the command to read from standard input.  With the --syslog\n"
 "    option, the command is logged.\n"
 "\n"
 "The following is roughly equivalent to running {command} directly:\n"
-"  " PACKAGE_NAME " [-n] -i {command} | " PACKAGE_NAME " | " PACKAGE_NAME " -o\n", fmt ? stdout : stderr);
+"  " PACKAGE_NAME " [-p] -i {command} | " PACKAGE_NAME " | " PACKAGE_NAME " -o\n", fmt ? stdout : stderr);
 	exit(fmt ? 2 : 0);
 }
 
@@ -664,14 +664,14 @@ int main(int argc, char *argv[])
 	int opt_server = false, opt_test = false;
 	bool opt_quote = true;
 	const char *opt_prefix = NULL, *opt_error_prefix = NULL;
-	int flags = WITH_STDIN;
+	int flags = 0;
 
 	progname = basename(argv[0]);
 
 	for(;;) {
 		int c;
 
-		c = getopt_long(argc, argv, "+niI:oO:Qvh", long_options, NULL);
+		c = getopt_long(argc, argv, "+piI:oO:Qvh", long_options, NULL);
 		if (c == -1)
 			break;
 
@@ -690,21 +690,21 @@ int main(int argc, char *argv[])
 			/* read from standard input by default */
 			opt_output = optarg ? use_fd_or_open_file(optarg, O_RDONLY) : 0;
 			break;
-		case 'p':
+		case 1:
 			opt_prefix = optarg;
 			break;
-		case 'P':
+		case 2:
 			opt_error_prefix = optarg;
 			break;
 		case 'Q':
 			opt_quote = false;
 			break;
-		case 'n':
+		case 'p':
 			/* Redirect standard input to /dev/null.  Only
 			 * effective when passing the command to run on the
 			 * command line; otherwise, we never read from
 			 * exxe's standard input.  */
-			flags &= ~WITH_STDIN;
+			flags |= WITH_STDIN;
 			break;
 		case 's':
 			flags |= WITH_SYSLOG;

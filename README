@@ -27,12 +27,12 @@ for running a command, as well as for translating the output back into its
 original form.  For example, the following command will produce the above
 input:
 
-	echo 'hello world!' | exxe -i tr a-z A-Z
+	echo 'hello world!' | exxe -pi tr a-z A-Z
 
 and the following two commands will both produce the same result:
 
 	echo 'hello world!' | tr a-z A-Z
 
-	echo 'hello world!' | exxe -i tr a-z A-Z | exxe | exxe -o
+	echo 'hello world!' | exxe -pi tr a-z A-Z | exxe | exxe -o
 
 See the test suite for more use cases.

@@ -44,13 +44,13 @@ check 'exxe sh -c "echo bar >&2; sleep 0.1; echo foo"' <<EOF
 EOF
 
 # Read from standard input (default for direct commands)
-check 'echo foo | exxe cat' <<EOF
+check 'echo foo | exxe -p cat' <<EOF
 > foo
 ? 0
 EOF
 
 # Do not read from standard input
-check 'echo foo | exxe -n cat' <<EOF
+check 'echo foo | exxe cat' <<EOF
 ? 0
 EOF
 
@@ -120,18 +120,18 @@ check 'exxe -i echo foo' <<EOF
 ! echo foo
 EOF
 
-check '(echo foo; echo bar) | exxe -i cat' <<EOF
+check '(echo foo; echo bar) | exxe -pi cat' <<EOF
 > foo
 > bar
 ! cat
 EOF
 
-check "echo -n foo | exxe -i cat" <<EOF
+check "echo -n foo | exxe -pi cat" <<EOF
 >3 foo
 ! cat
 EOF
 
-check "echo foo${backspace}bar | exxe -i cat" <<EOF
+check "echo foo${backspace}bar | exxe -pi cat" <<EOF
 >8 foo${backspace}bar
 ! cat
 EOF
@@ -185,7 +185,7 @@ ncheck 'mkfifo io oi'
 
 exxe < io > oi &
 CHILD_PID=$!
-check 'echo foo | exxe -Iio -Ooi cat' <<EOF
+check 'echo foo | exxe -p -Iio -Ooi cat' <<EOF
 foo
 EOF
 ncheck 'wait $CHILD_PID || echo status: $?'
