@@ -5,7 +5,6 @@ exxe_SOURCES = \
 	error.c \
 	error.h \
 	exxe.c \
-	list.h \
 	parse.c \
 	parse.h \
 	xalloc.c \
