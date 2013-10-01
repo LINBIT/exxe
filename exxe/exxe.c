@@ -14,6 +14,8 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
+#include <sys/time.h>
+#include <time.h>
 #include <signal.h>
 #include <locale.h>
 #include <getopt.h>
@@ -35,8 +37,9 @@ static struct option long_options[] = {
 	{"out-to",   required_argument, 0, 'O' },
 	{"prefix",   required_argument, 0, 1 },
 	{"error-prefix", required_argument, 0, 2 },
+	{"syslog",   no_argument, 0, 3 },
+	{"logfile",  required_argument, 0, 4 },
 	{"no-quote", no_argument, 0, 'Q' },
-	{"syslog",   no_argument, 0, 's' },
 	{"version",  no_argument, 0, 'v' },
 	{"help",     no_argument, 0, 'h' },
 	{}
@@ -45,7 +48,8 @@ static struct option long_options[] = {
 const char *progname;
 
 bool read_from_stdin;
-bool log_to_syslog;
+bool log_to_syslog, log_to_logfile;
+FILE *logfile;
 
 static bool is_printable(const char *s, size_t len)
 {
@@ -354,39 +358,74 @@ static void set_signals(void)
 
 static void logit(const char *fmt, ...)
 {
-	if (log_to_syslog) {
-		static char *ident;
-		const char *new_ident;
-		va_list ap;
+	static char *ident;
+	const char *new_ident;
+	va_list ap;
 
-		new_ident = getenv("EXXE_IDENT");
-		if (!(new_ident && *new_ident))
-			new_ident = progname;
-		if (!ident || strcmp(new_ident, ident)) {
-			if (ident)
-				closelog();
-			free(ident);
-			ident = xstrdup(new_ident);
+	if (!(log_to_syslog || log_to_logfile))
+		return;
+
+	new_ident = getenv("EXXE_IDENT");
+	if (!(new_ident && *new_ident))
+		new_ident = progname;
+	if (!ident || strcmp(new_ident, ident)) {
+		if (ident && log_to_syslog)
+			closelog();
+		free(ident);
+		ident = xstrdup(new_ident);
+		if (log_to_syslog)
 			openlog(ident, 0, LOG_USER);
-		}
-		va_start(ap, fmt);
+	}
+
+	va_start(ap, fmt);
+	if (log_to_syslog) {
+		va_list ap2;
+
+		va_copy(ap2, ap);
 		vsyslog(LOG_USER | LOG_INFO, fmt, ap);
 		va_end(ap);
 	}
+	if (logfile) {
+		struct timeval tv;
+		struct tm *tm;
+		va_list ap2;
+
+		gettimeofday(&tv, NULL);
+		tm = localtime(&tv.tv_sec);
+		fprintf(logfile,
+			"%04u-%02u-%02uT%02u:%02u:%02u.%06u%+03d:%02u %s ",
+			tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday,
+			tm->tm_hour, tm->tm_min, tm->tm_sec,
+			(int)tv.tv_usec,
+			(int)(tm->tm_gmtoff / 3600),
+			(int)((abs(tm->tm_gmtoff) / 60) % 60),
+			ident);
+		va_copy(ap2, ap);
+		vfprintf(logfile, fmt, ap2);
+		va_end(ap2);
+		fprintf(logfile, "\n");
+		fflush(logfile);
+	}
+	va_end(ap);
 }
 
-static void log_command(char *argv[])
+static void log_command(int argc, char *argv[])
 {
-	if (log_to_syslog) {
-		char **argp, *str, *s;
+	if (log_to_syslog || log_to_logfile) {
+		int optind;
+		char *str, *s;
 
-		for (argp = argv, s = NULL; *argp; argp++)
-			s += strlen(*argp) + 1;
+		if (!argc) {
+			while (argv[argc])
+				argc++;
+		}
+		for (optind = 0, s = NULL; argv[optind]; optind++)
+			s += strlen(argv[optind]) + 1;
 		str = xalloc(s - (char *)NULL + 1);
-		for (argp = argv, s = str; *argp; argp++) {
-			size_t len = strlen(*argp);
+		for (optind = 0, s = str; argv[optind]; optind++) {
+			size_t len = strlen(argv[optind]);
 
-			memcpy(s, *argp, len);
+			memcpy(s, argv[optind], len);
 			s += len;
 			*s++ = ' ';
 		}
@@ -398,7 +437,7 @@ static void log_command(char *argv[])
 
 static void log_result(const char *command, int killed_by, int status)
 {
-	if (log_to_syslog) {
+	if (log_to_syslog || log_to_logfile) {
 		if (killed_by)
 			logit("%s has timed out",
 			      command);
@@ -423,7 +462,7 @@ static void run_command(char *argv[], struct buffer *in_buffer)
 	int in[2], out[2], err[2];
 	int killed_by = 0, status, ret;
 
-	log_command(argv);
+	log_command(0, argv);
 	status = do_internal(argv, in_buffer);
 	if (status != -1)
 		goto out;
@@ -630,12 +669,11 @@ static void usage(const char *fmt, ...)
 	}
 	fputs(
 "Execute commands indirectly.  This utility can be used in four different\n"
-"modes:\n"
+"ways:\n"
 "\n"
 "  " PACKAGE_NAME "\n"
 "    Act as a server: execute commands read from standard input, and report\n"
-"    the results on standard output.  With the --syslog option, all commands\n"
-"    are logged.\n"
+"    the results on standard output.\n"
 "\n"
 "  " PACKAGE_NAME " [-pQ] -i {command} ...\n"
 "    Produce the input the server expects for running {command}.  By default,\n"
@@ -654,11 +692,18 @@ static void usage(const char *fmt, ...)
 "  " PACKAGE_NAME " [-p] {command}\n"
 "    Execute {command} directly, but produce the same output that the\n"
 "    utility would produce in server mode.  The -p option can be used to\n"
-"    allow the command to read from standard input.  With the --syslog\n"
-"    option, the command is logged.\n"
+"    allow the command to read from standard input.\n"
 "\n"
-"The following is roughly equivalent to running {command} directly:\n"
-"  " PACKAGE_NAME " [-p] -i {command} | " PACKAGE_NAME " | " PACKAGE_NAME " -o\n", fmt ? stdout : stderr);
+"Options:\n"
+"  --syslog\n"
+"    Log all commands to the system log.  The EXXE_IDENT environment\n"
+"    variable can be used to change the syslog identifier; by default,\n"
+"    " PACKAGE_NAME "'s executable name is used.\n"
+"\n"
+"  --logfile=filename\n"
+"    Log all commands to the specified logfile.  The EXXE_IDENT environment\n"
+"    variable can be used to change the syslog identifier; by default,\n"
+"    " PACKAGE_NAME "'s executable name is used.\n", fmt ? stdout : stderr);
 	exit(fmt ? 2 : 0);
 }
 
@@ -725,8 +770,14 @@ int main(int argc, char *argv[])
 			 * exxe's standard input.  */
 			read_from_stdin = true;
 			break;
-		case 's':
+		case 3:
 			log_to_syslog = true;
+			break;
+		case 4:
+			logfile = fopen(optarg, "a");
+			if (!logfile)
+				fatal("%s: %s", optarg, strerror(errno));
+			log_to_logfile = true;
 			break;
 		case 'v':
 			printf("%s %s\n", PACKAGE_NAME, PACKAGE_VERSION);
@@ -785,6 +836,7 @@ int main(int argc, char *argv[])
 			print_buffer(&in_buffer, -1);
 			free_buffer(&in_buffer);
 		}
+		log_command(argc - optind, argv + optind);
 		fputc('!', stdout);
 		for (; optind < argc; optind++) {
 			fputc(' ', stdout);
@@ -812,7 +864,8 @@ int main(int argc, char *argv[])
 			if (stdin_dup < 0)
 				fatal("duplicating standard input");
 			if (dup2(opt_output, 0) < 0)
-				fatal("file descriptor %d: %s", opt_output, strerror(errno));
+				fatal("file descriptor %d: %s",
+				      opt_output, strerror(errno));
 		}
 
 		if (optind != argc)
@@ -832,8 +885,11 @@ int main(int argc, char *argv[])
 				write_output(&command.error, stderr, opt_error_prefix);
 				break;
 			case '?':
+				if (command.status != 0)
+					log_result(NULL, 0, command.status);
 				exit(command.status);
 			case '$':
+				log_result(NULL, command.signal, 0);
 				kill(getpid(), command.signal);
 				exit(0);
 			}
