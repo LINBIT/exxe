@@ -44,7 +44,8 @@ static struct option long_options[] = {
 
 const char *progname;
 
-enum { WITH_STDIN = 1, WITH_SYSLOG = 2 };
+bool read_from_stdin;
+bool log_to_syslog;
 
 static bool is_printable(const char *s, size_t len)
 {
@@ -351,14 +352,14 @@ static void set_signals(void)
 		fatal("setting SIGCHLD signal");
 }
 
-static void run_command(char *argv[], struct buffer *in_buffer, int flags)
+static void run_command(char *argv[], struct buffer *in_buffer)
 {
 	static int dev_null = -1;
 	pid_t pid;
 	int in[2], out[2], err[2];
 	int killed_by = 0, status, ret;
 
-	if (flags & WITH_SYSLOG) {
+	if (log_to_syslog) {
 		static const char *ident;
 
 		char **argp, *str, *s;
@@ -404,7 +405,7 @@ static void run_command(char *argv[], struct buffer *in_buffer, int flags)
 	if (ret != 0)
 		fatal("creating pipe");
 
-	if (!in_buffer && !(flags & WITH_STDIN) && dev_null == -1) {
+	if (!in_buffer && !read_from_stdin && dev_null == -1) {
 		dev_null = open("/dev/null", O_RDONLY);
 		if (dev_null < 0) {
 			perror("/dev/null");
@@ -510,7 +511,7 @@ static void run_command(char *argv[], struct buffer *in_buffer, int flags)
 		}
 	} else {
 		setpgrp();
-		if (!(flags & WITH_STDIN))
+		if (!read_from_stdin)
 			dup2(in[0] == -1 ? dev_null : in[0], 0);
 		dup2(out[1], 1);
 		dup2(err[1], 2);
@@ -531,7 +532,7 @@ out:
 		printf("?\n");
 	fflush(stdout);
 
-	if (flags & WITH_SYSLOG) {
+	if (log_to_syslog) {
 		if (killed_by)
 			syslog(LOG_USER | LOG_INFO,
 			       "%s has timed out",
@@ -664,7 +665,6 @@ int main(int argc, char *argv[])
 	int opt_server = false, opt_test = false;
 	bool opt_quote = true;
 	const char *opt_prefix = NULL, *opt_error_prefix = NULL;
-	int flags = 0;
 
 	progname = basename(argv[0]);
 
@@ -704,10 +704,10 @@ int main(int argc, char *argv[])
 			 * effective when passing the command to run on the
 			 * command line; otherwise, we never read from
 			 * exxe's standard input.  */
-			flags |= WITH_STDIN;
+			read_from_stdin = true;
 			break;
 		case 's':
-			flags |= WITH_SYSLOG;
+			log_to_syslog = true;
 			break;
 		case 'v':
 			printf("%s %s\n", PACKAGE_NAME, PACKAGE_VERSION);
@@ -732,7 +732,7 @@ int main(int argc, char *argv[])
 	init_buffer(&onexit.in_buffer, 0);
 	onexit.argv = NULL;
 
-	if (flags & WITH_SYSLOG)
+	if (log_to_syslog)
 		openlog(progname, 0, LOG_USER);
 
 	if (opt_input != -1) {
@@ -751,7 +751,7 @@ int main(int argc, char *argv[])
 		if (optind == argc)
 			usage("command-line arguments missing");
 
-		if (flags & WITH_STDIN) {
+		if (read_from_stdin) {
 			struct buffer in_buffer;
 
 			init_buffer(&in_buffer, 1 << 12);
@@ -839,7 +839,7 @@ int main(int argc, char *argv[])
 		set_signals();
 		init_buffer(&command.input, 1 << 12);
 		command.argv = NULL;
-		flags &= ~WITH_STDIN;
+		read_from_stdin = false;
 
 		for(;;) {
 			if (!parse_input(&command))
@@ -848,7 +848,7 @@ int main(int argc, char *argv[])
 			case '>':
 				break;
 			case '!':
-				run_command(command.argv, &command.input, flags);
+				run_command(command.argv, &command.input);
 				reset_buffer(&command.input);
 				free_argv(command.argv);
 				command.argv = NULL;
@@ -869,11 +869,11 @@ int main(int argc, char *argv[])
 		for (n = optind; n < argc; n++)
 			args[n - optind] = argv[n];
 		args[n - optind] = NULL;
-		run_command(args, NULL, flags);
+		run_command(args, NULL);
 	}
 
 	if (onexit.argv)
-		run_command(onexit.argv, &onexit.in_buffer, flags);
+		run_command(onexit.argv, &onexit.in_buffer);
 
 	return 0;
 }
