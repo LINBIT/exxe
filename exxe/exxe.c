@@ -352,24 +352,33 @@ static void set_signals(void)
 		fatal("setting SIGCHLD signal");
 }
 
-static void run_command(char *argv[], struct buffer *in_buffer)
+static void logit(const char *fmt, ...)
 {
-	static int dev_null = -1;
-	pid_t pid;
-	int in[2], out[2], err[2];
-	int killed_by = 0, status, ret;
-
 	if (log_to_syslog) {
-		static const char *ident;
+		static char *ident;
+		const char *new_ident;
+		va_list ap;
 
-		char **argp, *str, *s;
-
-		s = getenv("EXXE_IDENT");
-		if (!ident || !s || strcmp(s, ident)) {
-			ident = (s && *s) ? s : progname;
-			closelog();
+		new_ident = getenv("EXXE_IDENT");
+		if (!(new_ident && *new_ident))
+			new_ident = progname;
+		if (!ident || strcmp(new_ident, ident)) {
+			if (ident)
+				closelog();
+			free(ident);
+			ident = xstrdup(new_ident);
 			openlog(ident, 0, LOG_USER);
 		}
+		va_start(ap, fmt);
+		vsyslog(LOG_USER | LOG_INFO, fmt, ap);
+		va_end(ap);
+	}
+}
+
+static void log_command(char *argv[])
+{
+	if (log_to_syslog) {
+		char **argp, *str, *s;
 
 		for (argp = argv, s = NULL; *argp; argp++)
 			s += strlen(*argp) + 1;
@@ -382,10 +391,39 @@ static void run_command(char *argv[], struct buffer *in_buffer)
 			*s++ = ' ';
 		}
 		*(--s) = 0;
-		syslog(LOG_USER | LOG_INFO, "%s", str);
+		logit("%s", str);
 		free(str);
 	}
+}
 
+static void log_result(const char *command, int killed_by, int status)
+{
+	if (log_to_syslog) {
+		if (killed_by)
+			logit("%s has timed out",
+			      command);
+		else if (WIFEXITED(status)) {
+			if (WEXITSTATUS(status))
+				logit("%s has exited with status %d",
+				      command,
+				      WEXITSTATUS(status));
+		} else if (WIFSIGNALED(status)) {
+			logit("%s was killed by signal %u (%s)",
+			      command,
+			      WTERMSIG(status),
+			      strsignal(WTERMSIG(status)));
+		}
+	}
+}
+
+static void run_command(char *argv[], struct buffer *in_buffer)
+{
+	static int dev_null = -1;
+	pid_t pid;
+	int in[2], out[2], err[2];
+	int killed_by = 0, status, ret;
+
+	log_command(argv);
 	status = do_internal(argv, in_buffer);
 	if (status != -1)
 		goto out;
@@ -520,6 +558,7 @@ static void run_command(char *argv[], struct buffer *in_buffer)
 		exit(127);
 	}
 out:
+	log_result(argv[0], killed_by, status);
 	if (killed_by)
 		printf("$ %u Timeout\n", killed_by);
 	else if (WIFEXITED(status))
@@ -531,26 +570,6 @@ out:
 	} else
 		printf("?\n");
 	fflush(stdout);
-
-	if (log_to_syslog) {
-		if (killed_by)
-			syslog(LOG_USER | LOG_INFO,
-			       "%s has timed out",
-			       argv[0]);
-		else if (WIFEXITED(status)) {
-			if (WEXITSTATUS(status))
-				syslog(LOG_USER | LOG_INFO,
-				       "%s has exited with status %d",
-				       argv[0],
-				       WEXITSTATUS(status));
-		} else if (WIFSIGNALED(status)) {
-			syslog(LOG_USER | LOG_INFO,
-			       "%s was killed by signal %u (%s)",
-			       argv[0],
-			       WTERMSIG(status),
-			       strsignal(WTERMSIG(status)));
-		}
-	}
 }
 
 static bool strchrs(const char *any, const char *str)
@@ -731,9 +750,6 @@ int main(int argc, char *argv[])
 	init_buffer(&expanded_input, 0);
 	init_buffer(&onexit.in_buffer, 0);
 	onexit.argv = NULL;
-
-	if (log_to_syslog)
-		openlog(progname, 0, LOG_USER);
 
 	if (opt_input != -1) {
 		int stdout_dup = -1;
