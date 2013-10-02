@@ -1,4 +1,2 @@
 * man page
-* Timeout for commands
 * Document the syntax
-* Implement syslog logging on the server
