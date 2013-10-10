@@ -26,6 +26,7 @@ struct output_command {
 	char command;
 	struct buffer output, error;
 	unsigned int status, signal;
+	char *reason;
 };
 
 bool parse_input(struct input_command *command);

@@ -329,25 +329,34 @@ bool parse_input(struct input_command *command)
 	}
 }
 
-static void parse_number_and_garbage(unsigned int *number, char command)
+static void parse_space(char command)
 {
 	int c = input();
 
-	while (c == ' ' || c == '\t')
-		c = input();
-	unput(c);
-	if (!parse_number(number))
-		fatal("Number expected in command '%c'", command);
+	if (c != ' ')
+		fatal("Space expected in command '%c'", c);
+}
 
-	c = input();
-	while (c != EOF && c != '\n')
-		c = input();
+static void parse_reason(char **reason)
+{
+	struct buffer buffer;
+	int c = input();
+
+	init_buffer(&buffer, 0);
+	while (c != EOF && c != '\n') {
+		put_buffer(&buffer, c);
+		 c = input();
+	}
+	unput(c);
+	put_buffer(&buffer, 0);
+	*reason = steal_buffer(&buffer);
 }
 
 bool parse_output(struct output_command *command)
 {
 	int c = input();
 
+	command->reason = NULL;
 	while (c == ' ' || c == '\t' || c == '\n')
 		c = input();
 	switch(c) {
@@ -363,11 +372,17 @@ bool parse_output(struct output_command *command)
 		command->command = '2';
 		return true;
 	case '?':
-		parse_number_and_garbage(&command->status, c);
+		parse_space(c);
+		if (!parse_number(&command->status))
+			fatal("Number expected in command '%c'", c);
 		command->command = c;
 		return true;
 	case '$':
-		parse_number_and_garbage(&command->signal, c);
+		parse_space(c);
+		if (!parse_number(&command->signal))
+			fatal("Number expected in command '%c'", c);
+		parse_space(c);
+		parse_reason(&command->reason);
 		command->command = c;
 		return true;
 	default:

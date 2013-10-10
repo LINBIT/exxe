@@ -446,22 +446,19 @@ static void log_command(int argc, char *argv[])
 	}
 }
 
-static void log_result(const char *command, int killed_by, int status)
+static void log_result(const char *command, int status, const char *reason)
 {
 	if (log_to_syslog || log_to_logfile) {
-		if (killed_by)
-			logit("%s has timed out",
-			      command);
-		else if (WIFEXITED(status)) {
+		if (WIFSIGNALED(status)) {
+			logit("%s was killed by signal %u (%s)",
+			      command,
+			      WTERMSIG(status),
+			      reason ? reason : strsignal(WTERMSIG(status)));
+		} else if (WIFEXITED(status)) {
 			if (WEXITSTATUS(status))
 				logit("%s has exited with status %d",
 				      command,
 				      WEXITSTATUS(status));
-		} else if (WIFSIGNALED(status)) {
-			logit("%s was killed by signal %u (%s)",
-			      command,
-			      WTERMSIG(status),
-			      strsignal(WTERMSIG(status)));
 		}
 	}
 }
@@ -472,6 +469,7 @@ static void run_command(char *argv[], struct buffer *in_buffer)
 	pid_t pid;
 	int in[2], out[2], err[2];
 	int killed_by = 0, status, ret;
+	const char *reason = NULL;
 
 	log_command(0, argv);
 	status = do_internal(argv, in_buffer);
@@ -565,12 +563,14 @@ static void run_command(char *argv[], struct buffer *in_buffer)
 					   controlled way.  */
 					killed_by = SIGTERM;
 					kill(pid, killed_by);
+					status = W_EXITCODE(0, killed_by);
 					break;
 				case SIGTERM:
 					/* The command didn't react; use force
 					   and kill the entire process group.  */
 					killed_by = SIGKILL;
 					killpg(pid, killed_by);
+					status = W_EXITCODE(0, killed_by);
 					break;
 				case SIGKILL:
 					break;
@@ -608,16 +608,14 @@ static void run_command(char *argv[], struct buffer *in_buffer)
 		exit(127);
 	}
 out:
-	log_result(argv[0], killed_by, status);
-	if (killed_by)
-		printf("$ %u Timeout\n", killed_by);
+	if (WIFSIGNALED(status))
+		reason = killed_by ? "Timeout" : strsignal(WTERMSIG(status));
+	log_result(argv[0], status, reason);
+	if (WIFSIGNALED(status))
+		printf("$ %u %s\n", WTERMSIG(status), reason);
 	else if (WIFEXITED(status))
 		printf("? %d\n", WEXITSTATUS(status));
-	else if (WIFSIGNALED(status)) {
-		printf("$ %u %s\n",
-		       WTERMSIG(status),
-		       strsignal(WTERMSIG(status)));
-	} else
+	else
 		printf("?\n");
 	fflush(stdout);
 }
@@ -897,10 +895,10 @@ int main(int argc, char *argv[])
 				break;
 			case '?':
 				if (command.status != 0)
-					log_result(NULL, 0, command.status);
+					log_result(NULL, W_EXITCODE(command.status, 0), command.reason);
 				exit(command.status);
 			case '$':
-				log_result(NULL, command.signal, 0);
+				log_result(NULL, W_EXITCODE(0, command.signal), command.reason);
 				kill(getpid(), command.signal);
 				exit(0);
 			}
