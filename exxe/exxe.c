@@ -449,6 +449,8 @@ static void log_command(int argc, char *argv[])
 static void log_result(const char *command, int status, const char *reason)
 {
 	if (log_to_syslog || log_to_logfile) {
+		if (!command)
+			command = "Command";
 		if (WIFSIGNALED(status)) {
 			logit("%s was killed by signal %u (%s)",
 			      command,
