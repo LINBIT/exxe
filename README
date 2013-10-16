@@ -13,10 +13,10 @@ can be useful for testing and automation.
 
 For example, the following input:
 
-	> hello world!
+	< hello world!
 	! tr a-z A-Z
 
-will execute the tr command and pass it a line of input; on success, the output
+will execute the tr command and pass it a line of input.  On success, the output
 will be as follows:
 
 	> HELLO WORLD!

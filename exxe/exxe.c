@@ -75,19 +75,21 @@ static bool is_printable(const char *s, size_t len)
 	return true;
 }
 
-static void print_str(const char *str, int size, int std_fd)
+static void print_str(const char *str, int size, int fd)
 {
-	if (std_fd != -1)
-		printf("%u", std_fd);
+	char inout = fd ? '>' : '<';
+
+	if (fd != 0 && fd != 1)
+		printf("%u", fd);
 	if (is_printable(str, size))
-		printf("> %.*s", size, str);
+		printf("%c %.*s", inout, size, str);
 	else if (str[size - 1] == '\n')
-		printf(">%u %.*s", size, size, str);
+		printf("%c%u %.*s", inout, size, size, str);
 	else
-		printf(">%u %.*s\n", size, size, str);
+		printf("%c%u %.*s\n", inout, size, size, str);
 }
 
-static void print_buffer(struct buffer *buffer, int std_fd)
+static void print_buffer(struct buffer *buffer, int fd)
 {
 	char *s = buffer_read_pos(buffer);
 	size_t size = buffer_size(buffer);
@@ -95,13 +97,13 @@ static void print_buffer(struct buffer *buffer, int std_fd)
 		char *nl = memchr(s, '\n', size);
 		int l = nl ? nl - s + 1 : size;
 
-		print_str(s, l, std_fd);
+		print_str(s, l, fd);
 		s += l;
 		size -= l;
 	}
 }
 
-static int read_from(struct buffer *buffer, int *pfd, int std_fd, const char *which)
+static int read_from(struct buffer *buffer, int *pfd, const char *which)
 {
 	ssize_t ret;
 
@@ -581,13 +583,13 @@ static void run_command(char *argv[], struct buffer *in_buffer)
 				if (FD_ISSET(in[1], &wfds))
 					write_to(&in[1], in_buffer, "standard input");
 				if (FD_ISSET(out[0], &rfds))
-					read_from(&out_buffer, &out[0], -1, "standard output");
+					read_from(&out_buffer, &out[0], "standard output");
 				if (FD_ISSET(err[0], &rfds))
-					read_from(&err_buffer, &err[0], 2, "standard error");
+					read_from(&err_buffer, &err[0], "standard error");
 			}
 		}
 
-		print_buffer(&out_buffer, -1);
+		print_buffer(&out_buffer, 1);
 		free_buffer(&out_buffer);
 		print_buffer(&err_buffer, 2);
 		free_buffer(&err_buffer);
@@ -844,7 +846,7 @@ int main(int argc, char *argv[])
 				if (feof(stdin))
 					break;
 			}
-			print_buffer(&in_buffer, -1);
+			print_buffer(&in_buffer, 0);
 			free_buffer(&in_buffer);
 		}
 		log_command(argc - optind, argv + optind);

@@ -98,7 +98,7 @@ check 'echo "! echo foo" | exxe' <<EOF
 ? 0
 EOF
 
-check '( echo "> foo"; echo "> bar"; echo "! cat" ) | exxe' <<EOF
+check '( echo "< foo"; echo "< bar"; echo "! cat" ) | exxe' <<EOF
 > foo
 > bar
 ? 0
@@ -121,18 +121,18 @@ check 'exxe -i echo foo' <<EOF
 EOF
 
 check '(echo foo; echo bar) | exxe -pi cat' <<EOF
-> foo
-> bar
+< foo
+< bar
 ! cat
 EOF
 
 check "echo -n foo | exxe -pi cat" <<EOF
->3 foo
+<3 foo
 ! cat
 EOF
 
 check "echo foo${backspace}bar | exxe -pi cat" <<EOF
->8 foo${backspace}bar
+<8 foo${backspace}bar
 ! cat
 EOF
 

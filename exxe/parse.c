@@ -314,7 +314,7 @@ bool parse_input(struct input_command *command)
 	while (c == ' ' || c == '\t' || c == '\n')
 		c = input();
 	switch(c) {
-	case '>':  /* standard input */
+	case '<':  /* standard input */
 		parse_data(&command->input);
 		command->command = c;
 		return true;

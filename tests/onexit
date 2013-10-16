@@ -14,7 +14,7 @@ check 'exxe onexit -' <<EOF
 ? 0
 EOF
 
-check '(echo "> foo"; echo "! onexit cat") | exxe' <<EOF
+check '(echo "< foo"; echo "! onexit cat") | exxe' <<EOF
 ? 0
 > foo
 ? 0
