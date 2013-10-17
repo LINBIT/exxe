@@ -930,8 +930,6 @@ int main(int argc, char *argv[])
 			if (!parse_input(&command))
 				break;
 			switch(command.command) {
-			case '>':
-				break;
 			case '!':
 				run_command(command.argv, &command.input);
 				reset_buffer(&command.input);
