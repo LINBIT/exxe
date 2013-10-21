@@ -371,7 +371,7 @@ static void set_signals(void)
 	sa.sa_handler = child_sig_handler;
 	sigemptyset(&sa.sa_mask);
 	if (sigaction(SIGCHLD, &sa, NULL))
-		fatal("setting SIGCHLD signal");
+		fatal("setting SIGCHLD handler");
 }
 
 static void logit(const char *fmt, ...)
