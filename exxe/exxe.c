@@ -271,24 +271,29 @@ static int do_onexit(char *argv[], struct buffer *in_buffer)
 
 struct timespec timeout;
 
-static int do_timeout(char *argv[], struct buffer *in_buffer)
+static int parse_timeout(struct timespec *tv, const char *str)
 {
 	double t, frac;
 	char *end;
 
-	if (!argv[1]) {
-		printf("> %g\n", timeout.tv_sec + timeout.tv_nsec * 1e-9);
-		return 0;
-	}
-	t = strtod(argv[1], &end);
+	t = strtod(str, &end);
 	if (*end || t < 0) {
 		errno = EINVAL;
 		return -1;
 	}
 	frac = modf(t, &t);
-	timeout.tv_sec = floor(t);
-	timeout.tv_nsec = floor(frac * 1e9);
+	tv->tv_sec = floor(t);
+	tv->tv_nsec = floor(frac * 1e9);
 	return 0;
+}
+
+static int do_timeout(char *argv[], struct buffer *in_buffer)
+{
+	if (!argv[1]) {
+		printf("> %g\n", timeout.tv_sec + timeout.tv_nsec * 1e-9);
+		return 0;
+	}
+	return parse_timeout(&timeout, argv[1]);
 }
 
 static int do_umask(char *argv[], struct buffer *in_buffer)
