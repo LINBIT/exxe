@@ -50,6 +50,7 @@ static struct option long_options[] = {
 	{"error-prefix", required_argument, 0, 2 },
 	{"syslog",   no_argument, 0, 3 },
 	{"logfile",  required_argument, 0, 4 },
+	{"timeout",  required_argument, 0, 5 },
 	{"no-quote", no_argument, 0, 'Q' },
 	{"version",  no_argument, 0, 'v' },
 	{"help",     no_argument, 0, 'h' },
@@ -357,7 +358,7 @@ static void child_sig_handler(int sig)
 	got_child_sig = 1;
 }
 
-static void set_signals(void)
+static void set_signals_for_commands(void)
 {
 	sigset_t sigmask;
 	struct sigaction sa;
@@ -372,6 +373,22 @@ static void set_signals(void)
 	sigemptyset(&sa.sa_mask);
 	if (sigaction(SIGCHLD, &sa, NULL))
 		fatal("setting SIGCHLD handler");
+}
+
+static void alarm_sig_handler(int sig)
+{
+	fatal("Timeout");
+}
+
+static void set_signals_for_io(void)
+{
+	struct sigaction sa;
+
+	sa.sa_flags = 0;
+	sa.sa_handler = alarm_sig_handler;
+	sigemptyset(&sa.sa_mask);
+	if (sigaction(SIGALRM, &sa, NULL))
+		fatal("setting SIGALRM handler");
 }
 
 static void logit(const char *fmt, ...)
@@ -675,6 +692,27 @@ static void print_arg(const char *arg, bool quote)
 	}
 }
 
+static void set_timeout(const char *str)
+{
+	struct itimerval itv;
+
+	if (parse_timeout(&timeout, str))
+		goto fail_errno;
+	if (timeout.tv_sec == 0 && timeout.tv_nsec == 0)
+		return;
+	itv.it_interval.tv_sec = 0;
+	itv.it_interval.tv_usec = 0;
+	itv.it_value.tv_sec = timeout.tv_sec;
+	itv.it_value.tv_usec = timeout.tv_nsec / 1000;
+	if (!setitimer(ITIMER_REAL, &itv, NULL))
+		return;
+
+fail_errno:
+	fprintf(stderr, "%s: timeout value '%s': %s\n", progname, str,
+		strerror(errno));
+	exit(2);
+}
+
 static void usage(const char *fmt, ...)
 {
 	if (fmt) {
@@ -713,6 +751,12 @@ static void usage(const char *fmt, ...)
 "    allow the command to read from standard input.\n"
 "\n"
 "Options:\n"
+"  --timeout=...\n"
+"    Set a timeout (or wait forever for a timeout value of 0).  If this option\n"
+"    is not specified and the EXXE_TIMEOUT environment variable is set, the\n"
+"    value of that variable is used.  In server mode, the built-in command\n"
+"    'timeout' can be used to later change the timeout.\n"
+"\n"
 "  --syslog\n"
 "    Log all commands to the system log.  The EXXE_IDENT environment\n"
 "    variable can be used to change the syslog identifier; by default,\n"
@@ -746,7 +790,7 @@ int main(int argc, char *argv[])
 	int opt_input = -1, opt_output = -1;
 	int opt_server = false, opt_test = false;
 	bool opt_quote = true;
-	const char *opt_prefix = NULL, *opt_error_prefix = NULL;
+	const char *opt_prefix = NULL, *opt_error_prefix = NULL, *opt_timeout = NULL;
 
 	progname = basename(argv[0]);
 
@@ -797,6 +841,9 @@ int main(int argc, char *argv[])
 				fatal("%s: %s", optarg, strerror(errno));
 			log_to_logfile = true;
 			break;
+		case 5:
+			opt_timeout = optarg;
+			break;
 		case 'v':
 			printf("%s %s\n", PACKAGE_NAME, PACKAGE_VERSION);
 			exit(0);
@@ -819,6 +866,17 @@ int main(int argc, char *argv[])
 	init_buffer(&expanded_input, 0);
 	init_buffer(&onexit.in_buffer, 0);
 	onexit.argv = NULL;
+
+	if (!opt_timeout) {
+		opt_timeout = getenv("EXXE_TIMEOUT");
+		if (opt_timeout && !*opt_timeout)
+			opt_timeout = NULL;
+	}
+	if (opt_timeout)
+	set_timeout(opt_timeout);
+
+	if (opt_input == -1 || opt_output == -1)
+		set_signals_for_io();
 
 	if (opt_input != -1) {
 		int stdout_dup = -1;
@@ -926,7 +984,7 @@ int main(int argc, char *argv[])
 
 		/* server mode */
 
-		set_signals();
+		set_signals_for_commands();
 		init_buffer(&command.input, 1 << 12);
 		command.argv = NULL;
 		read_from_stdin = false;
@@ -952,7 +1010,7 @@ int main(int argc, char *argv[])
 
 		/* test mode */
 
-		set_signals();
+		set_signals_for_commands();
 		setlocale(LC_CTYPE, NULL);
 		for (n = optind; n < argc; n++)
 			args[n - optind] = argv[n];

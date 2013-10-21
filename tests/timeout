@@ -4,6 +4,8 @@
 use_local_exxe
 use_tmpdir
 
+unset EXXE_TIMEOUT
+
 check '(echo "! timeout"; echo "! timeout 0.1"; echo "! timeout"; echo "! timeout 0"; echo "! timeout") | exxe' <<EOF
 > 0
 ? 0
@@ -18,4 +20,21 @@ EOF
 check '(echo "! timeout 0.1"; echo "! sleep 1") | exxe' <<EOF
 ? 0
 $ 15 Timeout
+EOF
+
+check 'sleep 1 | exxe -pi --timeout=0.1 cat || echo status: $?' <<EOF
+Timeout
+status: 1
+EOF
+
+check 'sleep 1 | exxe -o --timeout=0.1 || echo status: $?' <<EOF
+Timeout
+status: 1
+EOF
+
+export EXXE_TIMEOUT=0.1
+
+check 'sleep 1 | exxe -pi cat || echo status: $?' <<EOF
+Timeout
+status: 1
 EOF
