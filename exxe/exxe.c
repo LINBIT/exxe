@@ -61,6 +61,7 @@ const char *progname;
 
 bool read_from_stdin;
 bool log_to_syslog, log_to_logfile;
+const char *opt_prefix = NULL, *opt_error_prefix = NULL;
 FILE *logfile;
 
 static bool is_printable(const char *s, size_t len)
@@ -377,7 +378,7 @@ static void set_signals_for_commands(void)
 
 static void alarm_sig_handler(int sig)
 {
-	fatal("Timeout");
+	fatal("%sTimeout", opt_error_prefix ? opt_error_prefix : "");
 }
 
 static void set_signals_for_io(void)
@@ -790,7 +791,7 @@ int main(int argc, char *argv[])
 	int opt_input = -1, opt_output = -1;
 	int opt_server = false, opt_test = false;
 	bool opt_quote = true;
-	const char *opt_prefix = NULL, *opt_error_prefix = NULL, *opt_timeout = NULL;
+	const char *opt_timeout = NULL;
 
 	progname = basename(argv[0]);
 
