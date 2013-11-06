@@ -603,9 +603,9 @@ static void run_command(char *argv[], struct buffer *in_buffer)
 					break;
 				}
 			} else {
-				if (FD_ISSET(in[1], &wfds))
+				if (in[1] != -1 && FD_ISSET(in[1], &wfds))
 					write_to(&in[1], in_buffer, "standard input");
-				if (FD_ISSET(out[0], &rfds))
+				if (out[0] != -1 && FD_ISSET(out[0], &rfds))
 					read_from(&out_buffer, &out[0], "standard output");
 				if (FD_ISSET(err[0], &rfds))
 					read_from(&err_buffer, &err[0], "standard error");
