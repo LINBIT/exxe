@@ -962,8 +962,7 @@ int main(int argc, char *argv[])
 				write_output(&command.error, stderr, opt_error_prefix);
 				break;
 			case '?':
-				if (command.status != 0)
-					log_result(NULL, W_EXITCODE(command.status, 0), command.reason);
+				log_result(NULL, W_EXITCODE(command.status, 0), command.reason);
 				exit(command.status);
 			case '$':
 				log_result(NULL, W_EXITCODE(0, command.signal), command.reason);
