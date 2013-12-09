@@ -962,11 +962,11 @@ int main(int argc, char *argv[])
 				write_output(&command.error, stderr, opt_error_prefix);
 				break;
 			case '?':
-				log_result(NULL, W_EXITCODE(command.status, 0), command.reason);
-				exit(command.status);
+				log_result(NULL, command.status, command.reason);
+				exit(WEXITSTATUS(command.status));
 			case '$':
-				log_result(NULL, W_EXITCODE(0, command.signal), command.reason);
-				kill(getpid(), command.signal);
+				log_result(NULL, command.status, command.reason);
+				kill(getpid(), WTERMSIG(command.status));
 				exit(0);
 			}
 		}

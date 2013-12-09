@@ -25,7 +25,7 @@ struct input_command {
 struct output_command {
 	char command;
 	struct buffer output, error;
-	unsigned int status, signal;
+	unsigned int status;
 	char *reason;
 };
 

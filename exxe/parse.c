@@ -18,6 +18,7 @@
 #include <limits.h>
 #include <errno.h>
 #include <string.h>
+#include <sys/wait.h>
 
 #include "buffer.h"
 #include "error.h"
@@ -355,6 +356,7 @@ static void parse_reason(char **reason)
 bool parse_output(struct output_command *command)
 {
 	int c = input();
+	unsigned int i;
 
 	command->reason = NULL;
 	while (c == ' ' || c == '\t' || c == '\n')
@@ -373,17 +375,19 @@ bool parse_output(struct output_command *command)
 		return true;
 	case '?':
 		parse_space(c);
-		if (!parse_number(&command->status))
+		if (!parse_number(&i))
 			fatal("Number expected in command '%c'", c);
 		command->command = c;
+		command->status = W_EXITCODE(i, 0);
 		return true;
 	case '$':
 		parse_space(c);
-		if (!parse_number(&command->signal))
+		if (!parse_number(&i))
 			fatal("Number expected in command '%c'", c);
 		parse_space(c);
 		parse_reason(&command->reason);
 		command->command = c;
+		command->status = W_EXITCODE(0, i);
 		return true;
 	default:
 		if (c != EOF)
