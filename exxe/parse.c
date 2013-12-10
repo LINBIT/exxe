@@ -269,24 +269,15 @@ out:
 	return defined;
 }
 
-static unsigned int count_args(char **argv)
+static void put_arg(struct command *command, char *arg)
 {
-	unsigned int argc = 0;
-	while (*argv++)
-		argc++;
-	return argc;
+	command->argv = xrealloc(command->argv,
+		(command->argc + 2) * sizeof(*command->argv));
+	command->argv[command->argc++] = arg;
+	command->argv[command->argc] = NULL;
 }
 
-static void put_arg(char ***argv, char *arg)
-{
-	unsigned int argc = *argv ? count_args(*argv) : 0;
-
-	*argv = xrealloc(*argv, (argc + 2) * sizeof(**argv));
-	(*argv)[argc++] = arg;
-	(*argv)[argc++] = NULL;
-}
-
-static void parse_command(char ***argv)
+static void parse_command(struct command *command)
 {
 	int c = get();
 
@@ -298,11 +289,11 @@ static void parse_command(char ***argv)
 
 		init_buffer(&buffer, 0);
 		if (!parse_word(&buffer, &more)) {
-			if (*argv)
+			if (command->argc)
 				return;
 			fatal("Unexpected EOF while looking for a word");
 		}
-		put_arg(argv, steal_buffer(&buffer));
+		put_arg(command, steal_buffer(&buffer));
 		if (!more)
 			return;
 	}
@@ -320,7 +311,7 @@ bool parse_exxe_input(struct exxe_input *input)
 		input->what = c;
 		return true;
 	case '!':  /* command to run */
-		parse_command(&input->argv);
+		parse_command(&input->command);
 		input->what = c;
 		return true;
 	default:
@@ -396,13 +387,20 @@ bool parse_exxe_output(struct exxe_output *output)
 	}
 }
 
-void free_argv(char **argv)
+void init_command(struct command *command)
 {
-	int n;
+	command->argv = NULL;
+	command->argc = 0;
+}
 
-	if (argv) {
-		for (n = 0; argv[n]; n++)
-			free(argv[n]);
-		free(argv);
+void free_command(struct command *command)
+{
+	if (command->argv) {
+		int n;
+
+		for (n = 0; n < command->argc; n++)
+			free(command->argv[n]);
+		free(command->argv);
+		init_command(command);
 	}
 }

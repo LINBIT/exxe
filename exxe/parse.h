@@ -16,10 +16,15 @@
 
 #include <stdbool.h>
 
+struct command {
+	char **argv;
+	int argc;
+};
+
 struct exxe_input {
 	char what;
 	struct buffer input;
-	char **argv;
+	struct command command;
 };
 
 struct exxe_output {
@@ -31,6 +36,8 @@ struct exxe_output {
 
 bool parse_exxe_input(struct exxe_input *input);
 bool parse_exxe_output(struct exxe_output *output);
-void free_argv(char **argv);
+
+void init_command(struct command *command);
+void free_command(struct command *command);
 
 #endif  /* __PARSE_H */

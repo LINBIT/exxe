@@ -986,7 +986,7 @@ int main(int argc, char *argv[])
 
 		set_signals_for_commands();
 		init_buffer(&input.input, 1 << 12);
-		input.argv = NULL;
+		init_command(&input.command);
 		read_from_stdin = false;
 
 		for(;;) {
@@ -994,15 +994,14 @@ int main(int argc, char *argv[])
 				break;
 			switch(input.what) {
 			case '!':
-				run_command(input.argv, &input.input);
+				run_command(input.command.argv, &input.input);
 				reset_buffer(&input.input);
-				free_argv(input.argv);
-				input.argv = NULL;
+				free_command(&input.command);
 				break;
 			}
 		}
 		free_buffer(&input.input);
-		free_argv(input.argv);
+		free_command(&input.command);
 	}
 	if (opt_test) {
 		char *args[argc - optind + 1];
