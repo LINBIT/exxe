@@ -19,6 +19,7 @@
 struct command {
 	char **argv;
 	int argc;
+	int status;
 };
 
 struct exxe_input {
@@ -30,7 +31,7 @@ struct exxe_input {
 struct exxe_output {
 	char what;
 	struct buffer output, error;
-	unsigned int status;
+	int status;
 	char *reason;
 };
 

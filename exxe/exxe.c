@@ -318,7 +318,7 @@ struct internal_command internal_commands[] = {
 	{}
 };
 
-static int do_internal(struct command *command, struct buffer *in_buffer)
+static bool do_internal(struct command *command, struct buffer *in_buffer)
 {
 	struct internal_command *internal_command;
 
@@ -333,10 +333,11 @@ static int do_internal(struct command *command, struct buffer *in_buffer)
 				print_errno_error(command->argv[0]);
 				ret = 1;
 			}
-			return W_EXITCODE(ret, 0);
+			command->status = W_EXITCODE(ret, 0);
+			return true;
 		}
 	}
-	return -1;
+	return false;
 }
 
 static volatile sig_atomic_t got_child_sig;
@@ -478,12 +479,11 @@ static void run_command(struct command *command, struct buffer *in_buffer)
 	static int dev_null = -1;
 	pid_t pid;
 	int in[2], out[2], err[2];
-	int killed_by = 0, status, ret;
+	int killed_by = 0, ret;
 	const char *reason = NULL;
 
 	log_command(command->argc, command->argv);
-	status = do_internal(command, in_buffer);
-	if (status != -1)
+	if (do_internal(command, in_buffer))
 		goto out;
 
 	if (in_buffer && buffer_size(in_buffer)) {
@@ -573,14 +573,14 @@ static void run_command(struct command *command, struct buffer *in_buffer)
 					   controlled way.  */
 					killed_by = SIGTERM;
 					kill(pid, killed_by);
-					status = W_EXITCODE(0, killed_by);
+					command->status = W_EXITCODE(0, killed_by);
 					break;
 				case SIGTERM:
 					/* The command didn't react; use force
 					   and kill the entire process group.  */
 					killed_by = SIGKILL;
 					killpg(pid, killed_by);
-					status = W_EXITCODE(0, killed_by);
+					command->status = W_EXITCODE(0, killed_by);
 					break;
 				case SIGKILL:
 					break;
@@ -601,10 +601,10 @@ static void run_command(struct command *command, struct buffer *in_buffer)
 		free_buffer(&err_buffer);
 
 		for(;;) {
-			ret = waitpid(pid, &status, 0);
+			ret = waitpid(pid, &command->status, 0);
 			if (ret != pid)
 				fatal("waiting for command");
-			if (!(WIFSTOPPED(status) || WIFCONTINUED(status)))
+			if (!(WIFSTOPPED(command->status) || WIFCONTINUED(command->status)))
 				break;
 		}
 	} else {
@@ -618,13 +618,13 @@ static void run_command(struct command *command, struct buffer *in_buffer)
 		exit(127);
 	}
 out:
-	if (WIFSIGNALED(status))
-		reason = killed_by ? "Timeout" : strsignal(WTERMSIG(status));
-	log_result(command->argv[0], status, reason);
-	if (WIFSIGNALED(status))
-		printf("$ %u %s\n", WTERMSIG(status), reason);
-	else if (WIFEXITED(status))
-		printf("? %d\n", WEXITSTATUS(status));
+	if (WIFSIGNALED(command->status))
+		reason = killed_by ? "Timeout" : strsignal(WTERMSIG(command->status));
+	log_result(command->argv[0], command->status, reason);
+	if (WIFSIGNALED(command->status))
+		printf("$ %u %s\n", WTERMSIG(command->status), reason);
+	else if (WIFEXITED(command->status))
+		printf("? %d\n", WEXITSTATUS(command->status));
 	else
 		printf("?\n");
 	fflush(stdout);
