@@ -227,35 +227,20 @@ static int do_export(char *argv[], struct buffer *in_buffer)
 
 struct {
 	struct buffer in_buffer;
-	char **argv;
+	struct command command;
 } onexit;
 
 static int do_onexit(char *argv[], struct buffer *in_buffer)
 {
-	int argc;
-
 	if (!argv[1]) {
 		errno = EINVAL;
 		return -1;
 	}
 
-	if (onexit.argv) {
-		for (argc = 0; onexit.argv[argc]; argc++)
-			free(onexit.argv[argc]);
-	}
-
-	if (!strcmp(argv[1], "-")) {
-		free(onexit.argv);
-		onexit.argv = NULL;
-	} else {
-		for (argc = 1; argv[argc]; argc++)
-			/* do nothing */ ;
-		onexit.argv = xrealloc(onexit.argv,
-			(argc + 1) * sizeof(onexit.argv[0]));
-		for (argc = 1; argv[argc]; argc++)
-			onexit.argv[argc - 1] = xstrdup(argv[argc]);
-		onexit.argv[argc - 1] = NULL;
-
+	free_command(&onexit.command);
+	if (strcmp(argv[1], "-") || argv[2]) {
+		for (argv++; *argv; argv++)
+			put_arg(&onexit.command, xstrdup(*argv));
 		reset_buffer(&onexit.in_buffer);
 		if (in_buffer && buffer_size(in_buffer)) {
 			size_t size;
@@ -333,17 +318,19 @@ struct internal_command internal_commands[] = {
 	{}
 };
 
-static int do_internal(char *argv[], struct buffer *in_buffer)
+static int do_internal(struct command *command, struct buffer *in_buffer)
 {
-	struct internal_command *command;
+	struct internal_command *internal_command;
 
-	for (command = internal_commands; command->name; command++) {
-		if (!strcmp(argv[0], command->name)) {
+	for (internal_command = internal_commands;
+	     internal_command->name;
+	     internal_command++) {
+		if (!strcmp(command->argv[0], internal_command->name)) {
 			int ret;
 
-			ret = command->command(argv, in_buffer);
+			ret = internal_command->command(command->argv, in_buffer);
 			if (ret < 0) {
-				print_errno_error(argv[0]);
+				print_errno_error(command->argv[0]);
 				ret = 1;
 			}
 			return W_EXITCODE(ret, 0);
@@ -451,10 +438,6 @@ static void log_command(int argc, char *argv[])
 		int optind;
 		char *str, *s;
 
-		if (!argc) {
-			while (argv[argc])
-				argc++;
-		}
 		for (optind = 0, s = NULL; argv[optind]; optind++)
 			s += strlen(argv[optind]) + 1;
 		str = xalloc(s - (char *)NULL + 1);
@@ -490,7 +473,7 @@ static void log_result(const char *command, int status, const char *reason)
 	}
 }
 
-static void run_command(char *argv[], struct buffer *in_buffer)
+static void run_command(struct command *command, struct buffer *in_buffer)
 {
 	static int dev_null = -1;
 	pid_t pid;
@@ -498,8 +481,8 @@ static void run_command(char *argv[], struct buffer *in_buffer)
 	int killed_by = 0, status, ret;
 	const char *reason = NULL;
 
-	log_command(0, argv);
-	status = do_internal(argv, in_buffer);
+	log_command(command->argc, command->argv);
+	status = do_internal(command, in_buffer);
 	if (status != -1)
 		goto out;
 
@@ -630,14 +613,14 @@ static void run_command(char *argv[], struct buffer *in_buffer)
 			dup2(in[0] == -1 ? dev_null : in[0], 0);
 		dup2(out[1], 1);
 		dup2(err[1], 2);
-		execvp(argv[0], argv);
-		fprintf(stderr, "%s: %s\n", argv[0], strerror(errno));
+		execvp(command->argv[0], command->argv);
+		fprintf(stderr, "%s: %s\n", command->argv[0], strerror(errno));
 		exit(127);
 	}
 out:
 	if (WIFSIGNALED(status))
 		reason = killed_by ? "Timeout" : strsignal(WTERMSIG(status));
-	log_result(argv[0], status, reason);
+	log_result(command->argv[0], status, reason);
 	if (WIFSIGNALED(status))
 		printf("$ %u %s\n", WTERMSIG(status), reason);
 	else if (WIFEXITED(status))
@@ -866,7 +849,7 @@ int main(int argc, char *argv[])
 
 	init_buffer(&expanded_input, 0);
 	init_buffer(&onexit.in_buffer, 0);
-	onexit.argv = NULL;
+	init_command(&onexit.command);
 
 	if (!opt_timeout) {
 		opt_timeout = getenv("EXXE_TIMEOUT");
@@ -994,7 +977,7 @@ int main(int argc, char *argv[])
 				break;
 			switch(input.what) {
 			case '!':
-				run_command(input.command.argv, &input.input);
+				run_command(&input.command, &input.input);
 				reset_buffer(&input.input);
 				free_command(&input.command);
 				break;
@@ -1004,21 +987,20 @@ int main(int argc, char *argv[])
 		free_command(&input.command);
 	}
 	if (opt_test) {
-		char *args[argc - optind + 1];
-		int n;
+		struct command command;
 
 		/* test mode */
 
 		set_signals_for_commands();
 		setlocale(LC_CTYPE, NULL);
-		for (n = optind; n < argc; n++)
-			args[n - optind] = argv[n];
-		args[n - optind] = NULL;
-		run_command(args, NULL);
+		init_command(&command);
+		for (; optind < argc; optind++)
+			put_arg(&command, argv[optind]);
+		run_command(&command, NULL);
 	}
 
-	if (onexit.argv)
-		run_command(onexit.argv, &onexit.in_buffer);
+	if (onexit.command.argc)
+		run_command(&onexit.command, &onexit.in_buffer);
 
 	return 0;
 }

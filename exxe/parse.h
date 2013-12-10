@@ -38,6 +38,7 @@ bool parse_exxe_input(struct exxe_input *input);
 bool parse_exxe_output(struct exxe_output *output);
 
 void init_command(struct command *command);
+void put_arg(struct command *command, char *arg);
 void free_command(struct command *command);
 
 #endif  /* __PARSE_H */

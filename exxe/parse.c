@@ -269,7 +269,7 @@ out:
 	return defined;
 }
 
-static void put_arg(struct command *command, char *arg)
+void put_arg(struct command *command, char *arg)
 {
 	command->argv = xrealloc(command->argv,
 		(command->argc + 2) * sizeof(*command->argv));
