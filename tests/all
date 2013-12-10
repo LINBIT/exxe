@@ -79,15 +79,15 @@ EOF
 # Termination by signal
 
 check 'exxe kill -INT 0' <<EOF
-$ 2 Interrupt
+? (2) Interrupt
 EOF
 
 check 'exxe kill -ALRM 0' <<EOF
-$ 14 Alarm clock
+? (14) Alarm clock
 EOF
 
 check 'exxe kill -TERM 0' <<EOF
-$ 15 Terminated
+? (15) Terminated
 EOF
 
 # ==============================================================
@@ -174,7 +174,7 @@ check '(echo "> foo"; echo "2> bar"; echo "? 0") | exxe -o > /dev/null' <<EOF
 bar
 EOF
 
-check 'echo "$ 2 Interrupt" | exxe -o || echo status: $?' <<EOF
+check 'echo "? (2) Interrupt" | exxe -o || echo status: $?' <<EOF
 status: 130
 EOF
 

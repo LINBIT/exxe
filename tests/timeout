@@ -19,7 +19,7 @@ EOF
 
 check '(echo "! timeout 0.1"; echo "! sleep 1") | exxe' <<EOF
 ? 0
-$ 15 Timeout
+? (15) Timeout
 EOF
 
 check 'sleep 1 | exxe -pi --timeout=0.1 cat || echo status: $?' <<EOF

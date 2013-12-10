@@ -334,6 +334,11 @@ static void parse_reason(char **reason)
 	struct buffer buffer;
 	int c = get();
 
+	if (c != ' ') {
+		unget(c);
+		*reason = NULL;
+		return;
+	}
 	init_buffer(&buffer, 0);
 	while (c != EOF && c != '\n') {
 		put_buffer(&buffer, c);
@@ -366,19 +371,20 @@ bool parse_exxe_output(struct exxe_output *output)
 		return true;
 	case '?':
 		parse_space(c);
+		c = get();
+		if (c != '(')
+			unget(c);
 		if (!parse_number(&i))
-			fatal("Number expected in command '%c'", c);
-		output->what = c;
-		output->status = W_EXITCODE(i, 0);
-		return true;
-	case '$':
-		parse_space(c);
-		if (!parse_number(&i))
-			fatal("Number expected in command '%c'", c);
-		parse_space(c);
+			fatal("Number expected in command '?'");
+		if (c == '(') {
+			c = get();
+			if (c != ')')
+				fatal("Expected ')' in command '?'");
+			c = '(';
+		}
+		output->what = '?';
+		output->status = c == '(' ? W_EXITCODE(0, i) : W_EXITCODE(i, 0);
 		parse_reason(&output->reason);
-		output->what = c;
-		output->status = W_EXITCODE(0, i);
 		return true;
 	default:
 		if (c != EOF)

@@ -622,7 +622,7 @@ out:
 		reason = killed_by ? "Timeout" : strsignal(WTERMSIG(command->status));
 	log_result(command->argv[0], command->status, reason);
 	if (WIFSIGNALED(command->status))
-		printf("$ %u %s\n", WTERMSIG(command->status), reason);
+		printf("? (%d) %s\n", WTERMSIG(command->status), reason);
 	else if (WIFEXITED(command->status))
 		printf("? %d\n", WEXITSTATUS(command->status));
 	else
@@ -946,11 +946,9 @@ int main(int argc, char *argv[])
 				break;
 			case '?':
 				log_result(NULL, output.status, output.reason);
+				if (WIFSIGNALED(output.status))
+					kill(getpid(), WTERMSIG(output.status));
 				exit(WEXITSTATUS(output.status));
-			case '$':
-				log_result(NULL, output.status, output.reason);
-				kill(getpid(), WTERMSIG(output.status));
-				exit(0);
 			}
 		}
 
