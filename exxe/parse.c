@@ -29,7 +29,7 @@
 struct buffer expanded_input;
 bool is_expanded_input = false;
 
-static int input(void)
+static int get(void)
 {
 	if (is_expanded_input) {
 		int c = get_buffer(&expanded_input);
@@ -41,7 +41,7 @@ static int input(void)
 	return fgetc(stdin);
 }
 
-static void unput(int c)
+static void unget(int c)
 {
 	if (c != EOF) {
 		if (is_expanded_input)
@@ -54,21 +54,21 @@ static void unput(int c)
 static bool parse_number(unsigned int *number)
 {
 	struct buffer buffer;
-	int c = input();
+	int c = get();
 
 	if (!(c >= '0' && c <= '9')) {
-		unput(c);
+		unget(c);
 		return false;
 	}
 	init_buffer(&buffer, 0);
 	put_buffer(&buffer, c);
 	for(;;) {
-		c = input();
+		c = get();
 		if (!(c >= '0' && c <= '9')) {
 			unsigned long l;
 			char *end;
 
-			unput(c);
+			unget(c);
 			put_buffer(&buffer, 0);
 			l = strtoul(buffer_read_pos(&buffer), &end, 10);
 			if (*end || l > INT_MAX)
@@ -89,9 +89,9 @@ static void parse_data(struct buffer *buffer)
 	int c;
 
 	size_defined = parse_number(&size);
-	c = input();
+	c = get();
 	if (c != ' ')
-		unput(c);
+		unget(c);
 	if (size_defined) {
 		size_t ret;
 
@@ -105,7 +105,7 @@ static void parse_data(struct buffer *buffer)
 		buffer_advance_write(buffer, size);
 	} else {
 		for(;;) {
-			c = input();
+			c = get();
 			if (c == EOF)
 				break;
 			put_buffer(buffer, c);
@@ -140,7 +140,7 @@ static void expand_variable(struct buffer *name)
 static void parse_dollar(struct buffer *buffer)
 {
 	struct buffer name;
-	int c = input();
+	int c = get();
 
 	switch(c) {
 	case '!': case '?': case '*': case '@': case '-': case '_': case '$':
@@ -148,7 +148,7 @@ static void parse_dollar(struct buffer *buffer)
 	case '{':
 		init_buffer(&name, 0);
 		for(;;) {
-			c = input();
+			c = get();
 			if (c == '}')
 				break;
 			if (!isname(c))
@@ -165,25 +165,25 @@ static void parse_dollar(struct buffer *buffer)
 		init_buffer(&name, 0);
 		do {
 			put_buffer(&name, c);
-			c = input();
+			c = get();
 		} while (isname(c));
-		unput(c);
+		unget(c);
 		expand_variable(&name);
 		free_buffer(&name);
 	} else {
 		put_buffer(&expanded_input, '$');
-		unput(c);
+		unget(c);
 		is_expanded_input = true;
 	}
 }
 
 static void parse_single_quoted(struct buffer *buffer)
 {
-	int c = input();
+	int c = get();
 
 	while (c != EOF && (is_expanded_input || c != '\'')) {
 		put_buffer(buffer, c);
-		c = input();
+		c = get();
 	}
 	if (c == EOF)
 		fatal("Unexpected EOF while looking for matching single quote");
@@ -191,7 +191,7 @@ static void parse_single_quoted(struct buffer *buffer)
 
 static void parse_double_quoted(struct buffer *buffer)
 {
-	int c = input();
+	int c = get();
 
 	while (c != EOF && (is_expanded_input || c != '"')) {
 		if (is_expanded_input)
@@ -201,7 +201,7 @@ static void parse_double_quoted(struct buffer *buffer)
 			parse_dollar(buffer);
 			break;
 		case '\\':
-			c = input();
+			c = get();
 			if (c == '\n')
 				break;
 			if (c == EOF)
@@ -210,7 +210,7 @@ static void parse_double_quoted(struct buffer *buffer)
 		escaped: default:
 			put_buffer(buffer, c);
 		}
-		c = input();
+		c = get();
 	}
 	if (c == EOF)
 		fatal("Unexpected EOF while looking for matching single quote");
@@ -219,10 +219,10 @@ static void parse_double_quoted(struct buffer *buffer)
 static bool parse_word(struct buffer *buffer, bool *more)
 {
 	bool defined = false;
-	int c = input();
+	int c = get();
 
 	while (c == ' ' || c == '\t')
-		c = input();
+		c = get();
 	for(;;) {
 		switch(c) {
 		case ' ': case '\t':
@@ -248,7 +248,7 @@ static bool parse_word(struct buffer *buffer, bool *more)
 			parse_double_quoted(buffer);
 			break;
 		case '\\':
-			c = input();
+			c = get();
 			if (c == EOF)
 				fatal("Unexpected EOF after backslash");
 			if (c == '\n')
@@ -261,7 +261,7 @@ static bool parse_word(struct buffer *buffer, bool *more)
 			defined = true;
 			put_buffer(buffer, c);
 		}
-		c = input();
+		c = get();
 	}
 
 out:
@@ -288,10 +288,10 @@ static void put_arg(char ***argv, char *arg)
 
 static void parse_command(char ***argv)
 {
-	int c = input();
+	int c = get();
 
 	if (c != ' ')
-		unput(c);
+		unget(c);
 	for(;;) {
 		struct buffer buffer;
 		bool more = false;
@@ -308,20 +308,20 @@ static void parse_command(char ***argv)
 	}
 }
 
-bool parse_input(struct input_command *command)
+bool parse_exxe_input(struct exxe_input *input)
 {
-	int c = input();
+	int c = get();
 
 	while (c == ' ' || c == '\t' || c == '\n')
-		c = input();
+		c = get();
 	switch(c) {
 	case '<':  /* standard input */
-		parse_data(&command->input);
-		command->command = c;
+		parse_data(&input->input);
+		input->what = c;
 		return true;
 	case '!':  /* command to run */
-		parse_command(&command->argv);
-		command->command = c;
+		parse_command(&input->argv);
+		input->what = c;
 		return true;
 	default:
 		if (c != EOF)
@@ -332,7 +332,7 @@ bool parse_input(struct input_command *command)
 
 static void parse_space(char command)
 {
-	int c = input();
+	int c = get();
 
 	if (c != ' ')
 		fatal("Space expected in command '%c'", c);
@@ -341,53 +341,53 @@ static void parse_space(char command)
 static void parse_reason(char **reason)
 {
 	struct buffer buffer;
-	int c = input();
+	int c = get();
 
 	init_buffer(&buffer, 0);
 	while (c != EOF && c != '\n') {
 		put_buffer(&buffer, c);
-		 c = input();
+		 c = get();
 	}
-	unput(c);
+	unget(c);
 	put_buffer(&buffer, 0);
 	*reason = steal_buffer(&buffer);
 }
 
-bool parse_output(struct output_command *command)
+bool parse_exxe_output(struct exxe_output *output)
 {
-	int c = input();
+	int c = get();
 	unsigned int i;
 
-	command->reason = NULL;
+	output->reason = NULL;
 	while (c == ' ' || c == '\t' || c == '\n')
-		c = input();
+		c = get();
 	switch(c) {
 	case '>':
-		parse_data(&command->output);
-		command->command = '1';
+		parse_data(&output->output);
+		output->what = '1';
 		return true;
 	case '2':
-		c = input();
+		c = get();
 		if (c != '>')
 			fatal("invalid command '%c'", c);
-		parse_data(&command->error);
-		command->command = '2';
+		parse_data(&output->error);
+		output->what = '2';
 		return true;
 	case '?':
 		parse_space(c);
 		if (!parse_number(&i))
 			fatal("Number expected in command '%c'", c);
-		command->command = c;
-		command->status = W_EXITCODE(i, 0);
+		output->what = c;
+		output->status = W_EXITCODE(i, 0);
 		return true;
 	case '$':
 		parse_space(c);
 		if (!parse_number(&i))
 			fatal("Number expected in command '%c'", c);
 		parse_space(c);
-		parse_reason(&command->reason);
-		command->command = c;
-		command->status = W_EXITCODE(0, i);
+		parse_reason(&output->reason);
+		output->what = c;
+		output->status = W_EXITCODE(0, i);
 		return true;
 	default:
 		if (c != EOF)

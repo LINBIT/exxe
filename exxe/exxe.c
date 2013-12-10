@@ -931,7 +931,7 @@ int main(int argc, char *argv[])
 		}
 	}
 	if (opt_output != -1) {
-		struct output_command command;
+		struct exxe_output output;
 		int stdin_dup = -1;
 
 		/* output from server */
@@ -948,25 +948,25 @@ int main(int argc, char *argv[])
 		if (optind != argc)
 			usage("no command-line arguments allowed");
 
-		init_buffer(&command.output, 1 << 12);
-		init_buffer(&command.error, 1 << 12);
+		init_buffer(&output.output, 1 << 12);
+		init_buffer(&output.error, 1 << 12);
 
 		for(;;) {
-			if (!parse_output(&command))
+			if (!parse_exxe_output(&output))
 				fatal("Unexpected EOF while reading the command output");
-			switch(command.command) {
+			switch(output.what) {
 			case '1':
-				write_output(&command.output, stdout, opt_prefix);
+				write_output(&output.output, stdout, opt_prefix);
 				break;
 			case '2':
-				write_output(&command.error, stderr, opt_error_prefix);
+				write_output(&output.error, stderr, opt_error_prefix);
 				break;
 			case '?':
-				log_result(NULL, command.status, command.reason);
-				exit(WEXITSTATUS(command.status));
+				log_result(NULL, output.status, output.reason);
+				exit(WEXITSTATUS(output.status));
 			case '$':
-				log_result(NULL, command.status, command.reason);
-				kill(getpid(), WTERMSIG(command.status));
+				log_result(NULL, output.status, output.reason);
+				kill(getpid(), WTERMSIG(output.status));
 				exit(0);
 			}
 		}
@@ -980,29 +980,29 @@ int main(int argc, char *argv[])
 		}
 	}
 	if (opt_server) {
-		struct input_command command;
+		struct exxe_input input;
 
 		/* server mode */
 
 		set_signals_for_commands();
-		init_buffer(&command.input, 1 << 12);
-		command.argv = NULL;
+		init_buffer(&input.input, 1 << 12);
+		input.argv = NULL;
 		read_from_stdin = false;
 
 		for(;;) {
-			if (!parse_input(&command))
+			if (!parse_exxe_input(&input))
 				break;
-			switch(command.command) {
+			switch(input.what) {
 			case '!':
-				run_command(command.argv, &command.input);
-				reset_buffer(&command.input);
-				free_argv(command.argv);
-				command.argv = NULL;
+				run_command(input.argv, &input.input);
+				reset_buffer(&input.input);
+				free_argv(input.argv);
+				input.argv = NULL;
 				break;
 			}
 		}
-		free_buffer(&command.input);
-		free_argv(command.argv);
+		free_buffer(&input.input);
+		free_argv(input.argv);
 	}
 	if (opt_test) {
 		char *args[argc - optind + 1];

@@ -16,21 +16,21 @@
 
 #include <stdbool.h>
 
-struct input_command {
-	char command;
+struct exxe_input {
+	char what;
 	struct buffer input;
 	char **argv;
 };
 
-struct output_command {
-	char command;
+struct exxe_output {
+	char what;
 	struct buffer output, error;
 	unsigned int status;
 	char *reason;
 };
 
-bool parse_input(struct input_command *command);
-bool parse_output(struct output_command *command);
+bool parse_exxe_input(struct exxe_input *input);
+bool parse_exxe_output(struct exxe_output *output);
 void free_argv(char **argv);
 
 #endif  /* __PARSE_H */
