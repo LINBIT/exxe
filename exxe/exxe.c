@@ -679,12 +679,10 @@ static void print_arg(const char *arg, bool quote)
 	}
 }
 
-static void set_timeout(const char *str)
+static void reset_timeout(void)
 {
 	struct itimerval itv;
 
-	if (parse_timeout(&timeout, str))
-		goto fail_errno;
 	if (timeout.tv_sec == 0 && timeout.tv_nsec == 0)
 		return;
 	itv.it_interval.tv_sec = 0;
@@ -693,11 +691,6 @@ static void set_timeout(const char *str)
 	itv.it_value.tv_usec = timeout.tv_nsec / 1000;
 	if (!setitimer(ITIMER_REAL, &itv, NULL))
 		return;
-
-fail_errno:
-	fprintf(stderr, "%s: timeout value '%s': %s\n", progname, str,
-		strerror(errno));
-	exit(2);
 }
 
 static void usage(const char *fmt, ...)
@@ -739,8 +732,9 @@ static void usage(const char *fmt, ...)
 "\n"
 "Options:\n"
 "  --timeout=...\n"
-"    Set a timeout (or wait forever for a timeout value of 0).  If this option\n"
-"    is not specified and the EXXE_TIMEOUT environment variable is set, the\n"
+"    Set a timeout (or wait forever for a timeout value of 0).  The timeout\n"
+"    restarts whenever a command produces some output.  If this option is\n"
+"    not specified and the EXXE_TIMEOUT environment variable is set, the\n"
 "    value of that variable is used.  In server mode, the built-in command\n"
 "    'timeout' can be used to later change the timeout.\n"
 "\n"
@@ -859,8 +853,14 @@ int main(int argc, char *argv[])
 		if (opt_timeout && !*opt_timeout)
 			opt_timeout = NULL;
 	}
-	if (opt_timeout)
-	set_timeout(opt_timeout);
+	if (opt_timeout) {
+		if (parse_timeout(&timeout, opt_timeout)) {
+			fprintf(stderr, "%s: timeout value '%s': %s\n",
+				progname, opt_timeout,
+				strerror(errno));
+			exit(2);
+		}
+	}
 
 	if (opt_input == -1 || opt_output == -1)
 		set_signals_for_io();
@@ -886,15 +886,19 @@ int main(int argc, char *argv[])
 
 			init_buffer(&in_buffer, 1 << 12);
 			for(;;) {
-				size_t size;
+				ssize_t size;
 
+				reset_timeout();
 				grow_buffer(&in_buffer, 1);
-				size = fread(buffer_write_pos(&in_buffer), 1, buffer_available(&in_buffer), stdin);
-				if (ferror(stdin))
+				size = TEMP_FAILURE_RETRY(
+					read(0,
+					     buffer_write_pos(&in_buffer),
+					     buffer_available(&in_buffer)));
+				if (size < 0)
 					fatal("Error reading from standard input");
-				buffer_advance_write(&in_buffer, size);
-				if (feof(stdin))
+				if (size == 0)
 					break;
+				buffer_advance_write(&in_buffer, size);
 			}
 			print_buffer(&in_buffer, 0);
 			free_buffer(&in_buffer);
@@ -938,6 +942,7 @@ int main(int argc, char *argv[])
 		init_buffer(&output.error, 1 << 12);
 
 		for(;;) {
+			reset_timeout();
 			if (!parse_exxe_output(&output))
 				fatal("Unexpected EOF while reading the command output");
 			switch(output.what) {
