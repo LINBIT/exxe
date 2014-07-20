@@ -111,7 +111,10 @@ static int read_from(struct buffer *buffer, int *pfd, const char *which)
 
 	grow_buffer(buffer, 4096);
 	for(;;) {
-		ret = read(*pfd, buffer_write_pos(buffer), buffer_available(buffer));
+		ret = TEMP_FAILURE_RETRY(
+			read(*pfd,
+			     buffer_write_pos(buffer),
+			     buffer_available(buffer)));
 		if (ret <= 0)
 			break;
 		buffer_advance_write(buffer, ret);
