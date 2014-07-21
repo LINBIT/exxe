@@ -618,6 +618,8 @@ static void run_command(struct command *command, struct buffer *in_buffer)
 		setpgrp();
 		if (!read_from_stdin)
 			dup2(in[0] == -1 ? dev_null : in[0], 0);
+		if (dev_null != -1)
+			close(dev_null);
 		dup2(out[1], 1);
 		dup2(err[1], 2);
 		execvp(command->argv[0], command->argv);
