@@ -489,13 +489,17 @@ static void run_command(struct command *command, struct buffer *in_buffer)
 	if (do_internal(command, in_buffer))
 		goto out;
 
-	if (in_buffer && buffer_size(in_buffer)) {
-		ret = pipe2(in, O_CLOEXEC);
-		if (ret != 0)
-			fatal("creating pipe");
-	} else {
-		in[0] = -1;
-		in[1] = -1;
+	in[0] = -1;
+	in[1] = -1;
+	if (in_buffer) {
+		if (!buffer_size(in_buffer)) {
+			in_buffer = NULL;
+			read_from_stdin = false;
+		} else {
+			ret = pipe2(in, O_CLOEXEC);
+			if (ret != 0)
+				fatal("creating pipe");
+		}
 	}
 	ret = pipe2(out, O_CLOEXEC);
 	if (ret != 0)
