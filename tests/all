@@ -31,13 +31,13 @@ check 'exxe sh -c "echo foo"' <<EOF
 ? 0
 EOF
 
-check 'exxe --buffer sh -c "echo foo; sleep 0.1; echo bar >&2"' <<EOF
+check 'exxe --canonical-output sh -c "echo foo; sleep 0.1; echo bar >&2"' <<EOF
 > foo
 2> bar
 ? 0
 EOF
 
-check 'exxe --buffer sh -c "echo bar >&2; sleep 0.1; echo foo"' <<EOF
+check 'exxe --canonical-output sh -c "echo bar >&2; sleep 0.1; echo foo"' <<EOF
 > foo
 2> bar
 ? 0

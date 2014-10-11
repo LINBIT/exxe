@@ -52,7 +52,7 @@ static struct option long_options[] = {
 	{"logfile",  required_argument, 0, 4 },
 	{"timeout",  required_argument, 0, 5 },
 	{"no-quote", no_argument, 0, 'Q' },
-	{"buffer-output", no_argument, 0, 6 },
+	{"canonical-output", no_argument, 0, 6 },
 	{"version",  no_argument, 0, 'v' },
 	{"help",     no_argument, 0, 'h' },
 	{}
@@ -60,7 +60,7 @@ static struct option long_options[] = {
 
 const char *progname;
 
-bool read_from_stdin, buffer_output;
+bool read_from_stdin, canonical_output;
 bool log_to_syslog, log_to_logfile;
 const char *opt_prefix = NULL, *opt_error_prefix = NULL;
 FILE *logfile;
@@ -599,14 +599,14 @@ static void run_command(struct command *command, struct buffer *in_buffer)
 					write_to(&in[1], in_buffer, "standard input");
 				if (out[0] != -1 && FD_ISSET(out[0], &rfds)) {
 					read_from(&out_buffer, &out[0], "standard output");
-					if (!buffer_output) {
+					if (!canonical_output) {
 						print_buffer(&out_buffer, 1);
 						reset_buffer(&out_buffer);
 					}
 				}
 				if (FD_ISSET(err[0], &rfds)) {
 					read_from(&err_buffer, &err[0], "standard error");
-					if (!buffer_output) {
+					if (!canonical_output) {
 						print_buffer(&err_buffer, 2);
 						reset_buffer(&err_buffer);
 					}
@@ -614,7 +614,7 @@ static void run_command(struct command *command, struct buffer *in_buffer)
 			}
 		}
 
-		if (buffer_output) {
+		if (canonical_output) {
 			print_buffer(&out_buffer, 1);
 			print_buffer(&err_buffer, 2);
 		}
@@ -751,7 +751,7 @@ static void usage(const char *fmt, ...)
 "    allow the command to read from standard input.\n"
 "\n"
 "Options:\n"
-"  --buffer-output\n"
+"  --canonical-output\n"
 "    When reading the standard and error output of a command, whatever has\n"
 "    been read is usually processed immediately.  With this option, all\n"
 "    output is buffered instead; then, standard output is processed before\n"
@@ -853,7 +853,7 @@ int main(int argc, char *argv[])
 			opt_timeout = optarg;
 			break;
 		case 6:
-			buffer_output = true;
+			canonical_output = true;
 			break;
 		case 'v':
 			printf("%s %s\n", PACKAGE_NAME, PACKAGE_VERSION);
