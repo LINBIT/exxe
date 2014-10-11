@@ -52,6 +52,7 @@ static struct option long_options[] = {
 	{"logfile",  required_argument, 0, 4 },
 	{"timeout",  required_argument, 0, 5 },
 	{"no-quote", no_argument, 0, 'Q' },
+	{"buffer-output", no_argument, 0, 6 },
 	{"version",  no_argument, 0, 'v' },
 	{"help",     no_argument, 0, 'h' },
 	{}
@@ -59,7 +60,7 @@ static struct option long_options[] = {
 
 const char *progname;
 
-bool read_from_stdin;
+bool read_from_stdin, buffer_output;
 bool log_to_syslog, log_to_logfile;
 const char *opt_prefix = NULL, *opt_error_prefix = NULL;
 FILE *logfile;
@@ -109,7 +110,8 @@ static int read_from(struct buffer *buffer, int *pfd, const char *which)
 {
 	ssize_t ret;
 
-	grow_buffer(buffer, 4096);
+	if (buffer_available(buffer) < 4096)
+		grow_buffer(buffer, 4096);
 	for(;;) {
 		ret = TEMP_FAILURE_RETRY(
 			read(*pfd,
@@ -595,16 +597,28 @@ static void run_command(struct command *command, struct buffer *in_buffer)
 			} else {
 				if (in[1] != -1 && FD_ISSET(in[1], &wfds))
 					write_to(&in[1], in_buffer, "standard input");
-				if (out[0] != -1 && FD_ISSET(out[0], &rfds))
+				if (out[0] != -1 && FD_ISSET(out[0], &rfds)) {
 					read_from(&out_buffer, &out[0], "standard output");
-				if (FD_ISSET(err[0], &rfds))
+					if (!buffer_output) {
+						print_buffer(&out_buffer, 1);
+						reset_buffer(&out_buffer);
+					}
+				}
+				if (FD_ISSET(err[0], &rfds)) {
 					read_from(&err_buffer, &err[0], "standard error");
+					if (!buffer_output) {
+						print_buffer(&err_buffer, 2);
+						reset_buffer(&err_buffer);
+					}
+				}
 			}
 		}
 
-		print_buffer(&out_buffer, 1);
+		if (buffer_output) {
+			print_buffer(&out_buffer, 1);
+			print_buffer(&err_buffer, 2);
+		}
 		free_buffer(&out_buffer);
-		print_buffer(&err_buffer, 2);
 		free_buffer(&err_buffer);
 
 		for(;;) {
@@ -737,6 +751,13 @@ static void usage(const char *fmt, ...)
 "    allow the command to read from standard input.\n"
 "\n"
 "Options:\n"
+"  --buffer-output\n"
+"    When reading the standard and error output of a command, whatever has\n"
+"    been read is usually processed immediately.  With this option, all\n"
+"    output is buffered instead; then, standard output is processed before\n"
+"    standard error.  Use for commands that write to standard output and\n"
+"    standard error when a deterministic order of results is required.\n"
+"\n"
 "  --timeout=...\n"
 "    Set a timeout (or wait forever for a timeout value of 0).  The timeout\n"
 "    restarts whenever a command produces some output.  If this option is\n"
@@ -830,6 +851,9 @@ int main(int argc, char *argv[])
 			break;
 		case 5:
 			opt_timeout = optarg;
+			break;
+		case 6:
+			buffer_output = true;
 			break;
 		case 'v':
 			printf("%s %s\n", PACKAGE_NAME, PACKAGE_VERSION);
