@@ -27,16 +27,16 @@
 /* Expanded variables are put into the expanded_input buffer; the parser reads
    them from there. */
 struct buffer expanded_input;
-bool is_expanded_input = false;
+bool have_expanded_input = false;
 
 static int get(void)
 {
-	if (is_expanded_input) {
+	if (have_expanded_input) {
 		int c = get_buffer(&expanded_input);
 		if (c != EOF)
 			return c;
 		reset_buffer(&expanded_input);
-		is_expanded_input = false;
+		have_expanded_input = false;
 	}
 	return fgetc(stdin);
 }
@@ -44,7 +44,7 @@ static int get(void)
 static void unget(int c)
 {
 	if (c != EOF) {
-		if (is_expanded_input)
+		if (have_expanded_input)
 			unget_buffer(&expanded_input, c);
 		else
 			ungetc(c, stdin);
@@ -133,7 +133,7 @@ static void expand_variable(struct buffer *name)
 		grow_buffer(&expanded_input, size);
 		memcpy(buffer_write_pos(&expanded_input), value, size);
 		buffer_advance_write(&expanded_input, size);
-		is_expanded_input = true;
+		have_expanded_input = true;
 	}
 }
 
@@ -173,7 +173,7 @@ static void parse_dollar(struct buffer *buffer)
 	} else {
 		put_buffer(&expanded_input, '$');
 		unget(c);
-		is_expanded_input = true;
+		have_expanded_input = true;
 	}
 }
 
@@ -181,7 +181,7 @@ static void parse_single_quoted(struct buffer *buffer)
 {
 	int c = get();
 
-	while (c != EOF && (is_expanded_input || c != '\'')) {
+	while (c != EOF && (have_expanded_input || c != '\'')) {
 		put_buffer(buffer, c);
 		c = get();
 	}
@@ -193,8 +193,8 @@ static void parse_double_quoted(struct buffer *buffer)
 {
 	int c = get();
 
-	while (c != EOF && (is_expanded_input || c != '"')) {
-		if (is_expanded_input)
+	while (c != EOF && (have_expanded_input || c != '"')) {
+		if (have_expanded_input)
 			goto escaped;
 		switch(c) {
 		case '$':
@@ -233,7 +233,7 @@ static bool parse_word(struct buffer *buffer, bool *more)
 			goto out;
 		}
 
-		if (is_expanded_input)
+		if (have_expanded_input)
 			goto escaped;
 
 		switch(c) {
