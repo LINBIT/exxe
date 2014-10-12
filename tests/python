@@ -1,0 +1,104 @@
+#! /bin/sh
+
+. $srcdir/test-lib.sh
+use_local_exxe
+use_tmpdir
+
+py_exxe() {
+    $abs_top_builddir/python/Exxe.py --server=$abs_top_builddir/exxe/exxe "$@"
+}
+
+backspace="`echo -e '\b'`"
+
+# ==============================================================
+
+check 'py_exxe echo foo || echo status: $?' <<EOF
+foo
+EOF
+
+check 'py_exxe -- echo -e "foo\nbar"' <<EOF
+foo
+bar
+EOF
+
+check "py_exxe -- echo 'foo${backspace}bar'" <<EOF
+foo${backspace}bar
+EOF
+
+check 'py_exxe -- sh -c "echo foo"' <<EOF
+foo
+EOF
+
+check 'py_exxe --canonical-output -- sh -c "echo foo; sleep 0.1; echo bar >&2"' <<EOF
+foo
+bar
+EOF
+
+check 'py_exxe --canonical-output -- sh -c "echo bar >&2; sleep 0.1; echo foo"' <<EOF
+foo
+bar
+EOF
+
+# Read from standard input (default for direct commands)
+check 'echo foo | py_exxe -p -- cat' <<EOF
+foo
+EOF
+
+# Do not read from standard input
+check 'echo foo | py_exxe -- cat' <<EOF
+EOF
+
+check 'py_exxe -- ./missing || echo status: $?' <<EOF
+./missing: No such file or directory
+status: 127
+EOF
+
+# ==============================================================
+# Exit status
+
+check 'py_exxe -- sh -c "exit 1" || echo status: $?' <<EOF
+status: 1
+EOF
+
+check 'py_exxe -- sh -c "exit 255" || echo status: $?' <<EOF
+status: 255
+EOF
+
+# Only the low 8 bits in the exit status are meaningful
+check 'py_exxe -- sh -c "exit 256" || echo status: $?' <<EOF
+EOF
+
+# ==============================================================
+# Prefixes
+
+check "py_exxe --canonical-output --prefix='1> ' --error-prefix='2> ' -- bash -c 'echo foo; echo bar >&2'" <<EOF
+1> foo
+2> bar
+EOF
+
+# ==============================================================
+# Timeout
+
+# FIXME: How can we catch those signals here?
+
+#check 'py_exxe --timeout=0.1 -- sleep 0.2 || echo status: $?' <<EOF
+#Command 'sleep 0.2' timed out
+#status: 143
+#EOF
+
+# ==============================================================
+# Termination by signal
+
+# FIXME: How can we catch those signals here?
+
+#check 'py_exxe -- kill -INT 0 || echo status: $?' <<EOF
+#130
+#EOF
+
+#check 'py_exxe -- kill -ALRM 0 || echo status: $?' <<EOF
+#142
+#EOF
+
+#check 'py_exxe -- kill -TERM 0 || echo status: $?' <<EOF
+#143
+#EOF

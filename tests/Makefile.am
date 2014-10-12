@@ -2,6 +2,7 @@ TESTS = \
 	all \
 	onexit \
 	prefix \
+	python \
 	quoting_and_variables \
 	timeout
 
