@@ -24,9 +24,9 @@ class ProcessTimeoutError(CalledProcessError):
 
 class Exxe:
     def __init__(self, server, timeout=None, prefix=None, error_prefix=None):
-	self.server = subprocess.Popen(server, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
-	self.stdin = self.server.stdin.fileno()
-	self.stdout = self.server.stdout.fileno()
+	self.server = subprocess.Popen(server, shell=True,
+				       stdin=subprocess.PIPE,
+				       stdout=subprocess.PIPE)
 	self.timeout = timeout
 	self.prefix = prefix if prefix else ''
 	self.error_prefix = error_prefix if error_prefix else self.prefix
@@ -39,14 +39,14 @@ class Exxe:
 		x = '<' + str(len(line)) + ' ' + line
 	    else:
 		x = '< ' + line
-	    os.write(self.stdin, x)
+	    os.write(self.server.stdin.fileno(), x)
 
     def write_command(self, cmd, quote):
 	if isinstance(cmd, basestring):
 	    cmd = [cmd]
 	cmd = ' '.join([pipes.quote(arg) for arg in cmd] if quote else cmd)
 	self.cmd = cmd
-	os.write(self.stdin, '! ' + cmd + '\n')
+	os.write(self.server.stdin.fileno(), '! ' + cmd + '\n')
 
     def read_result(self, stdout, stderr):
 	if stdout is not None and not isinstance(stdout, file):
@@ -54,7 +54,8 @@ class Exxe:
 	if stderr is not None and not isinstance(stderr, file):
 	    stderr = StringIO()
 	poller = select.poll()
-	poller.register(self.stdout, select.POLLIN | select.POLLPRI)
+	poller.register(self.server.stdout.fileno(),
+			select.POLLIN | select.POLLPRI)
 
 	def reader_generator():
 	    data = ''
@@ -65,7 +66,7 @@ class Exxe:
 		    ready = poller.poll(self.timeout)
 		    if not ready:
 			raise ProcessTimeoutError(self.cmd)
-		    data = os.read(self.stdout, 4096)
+		    data = os.read(self.server.stdout.fileno(), 4096)
 		    if not data:
 			raise StopIteration()
 		    idx = 0
@@ -152,7 +153,8 @@ class Exxe:
 	except StopIteration:
 	    raise EOFError()
 
-    def run(self, cmd, stdin=None, stdout=sys.stdout, stderr=sys.stderr, quote=True):
+    def run(self, cmd, stdin=None, stdout=sys.stdout, stderr=sys.stderr,
+	    quote=True):
 	if stdin is not None:
 	    self.write_input(stdin)
 	self.write_command(cmd, quote)
@@ -193,7 +195,8 @@ if __name__ == '__main__':
 	sys.exit(128 - error.returncode)
     except CalledProcessError, error:
 	if error.returncode < 0:
-	    # FIXME: Python seems to catch SIGINT; it doesn't get through to user space
+	    # FIXME: Python seems to catch SIGINT; it doesn't get through to
+	    # user space
 	    os.kill(0, -error.returncode)
 	else:
 	    sys.exit(error.returncode)
