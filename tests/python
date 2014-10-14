@@ -39,6 +39,10 @@ foo
 bar
 EOF
 
+check 'py_exxe --prefix=">" -- echo || echo status: $?' <<EOF
+>
+EOF
+
 # Read from standard input (default for direct commands)
 check 'echo foo | py_exxe -p -- cat' <<EOF
 foo

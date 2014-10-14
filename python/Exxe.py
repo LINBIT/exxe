@@ -136,11 +136,13 @@ class Exxe:
 		    c = reader.next()
 		read = itertools.islice(reader, length - 1)
 		write_output(where, prefix + c + ''.join(read))
-		#c = reader.next()
 	    else:
 		if c == ' ':
 		    c = reader.next()
-		read = itertools.takewhile(lambda c: c != '\n', reader)
+		if c == '\n':
+		    read = []
+		else:
+		    read = itertools.takewhile(lambda c: c != '\n', reader)
 		write_output(where, prefix + c + ''.join(read) + '\n')
 
 	try:
