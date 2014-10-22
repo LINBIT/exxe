@@ -22,7 +22,7 @@ class ProcessTimeoutError(CalledProcessError):
 	return "Command '%s' timed out" % self.cmd
 
 
-class Exxe:
+class Exxe(object):
     def __init__(self, server, timeout=None, prefix=None, error_prefix=None):
 	self.server = subprocess.Popen(server, shell=True,
 				       stdin=subprocess.PIPE,
