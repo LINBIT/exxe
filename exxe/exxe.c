@@ -110,9 +110,9 @@ static int read_from(struct buffer *buffer, int *pfd, const char *which)
 {
 	ssize_t ret;
 
-	if (buffer_available(buffer) < 4096)
-		grow_buffer(buffer, 4096);
 	for(;;) {
+		if (buffer_available(buffer) < 4096)
+			grow_buffer(buffer, 4096);
 		ret = TEMP_FAILURE_RETRY(
 			read(*pfd,
 			     buffer_write_pos(buffer),
@@ -600,6 +600,7 @@ static void run_command(struct command *command, struct buffer *in_buffer)
 				if (out[0] != -1 && FD_ISSET(out[0], &rfds)) {
 					read_from(&out_buffer, &out[0], "standard output");
 					if (!canonical_output) {
+						/* FIXME: Don't print partial lines at the end. */
 						print_buffer(&out_buffer, 1);
 						reset_buffer(&out_buffer);
 					}
@@ -607,6 +608,7 @@ static void run_command(struct command *command, struct buffer *in_buffer)
 				if (FD_ISSET(err[0], &rfds)) {
 					read_from(&err_buffer, &err[0], "standard error");
 					if (!canonical_output) {
+						/* FIXME: Don't print partial lines at the end. */
 						print_buffer(&err_buffer, 2);
 						reset_buffer(&err_buffer);
 					}
@@ -614,6 +616,7 @@ static void run_command(struct command *command, struct buffer *in_buffer)
 			}
 		}
 
+		/* FIXME: Print remaining partial lines at the end. */
 		if (canonical_output) {
 			print_buffer(&out_buffer, 1);
 			print_buffer(&err_buffer, 2);
