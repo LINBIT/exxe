@@ -23,8 +23,8 @@ class ProcessTimeoutError(CalledProcessError):
 
 
 class Exxe(object):
-    def __init__(self, server, timeout=None, prefix=None, error_prefix=None):
-	self.server = subprocess.Popen(server, shell=True,
+    def __init__(self, server, shell=False, timeout=None, prefix=None, error_prefix=None):
+	self.server = subprocess.Popen(server, shell=shell,
 				       stdin=subprocess.PIPE,
 				       stdout=subprocess.PIPE)
 	self.timeout = timeout
@@ -180,7 +180,7 @@ if __name__ == '__main__':
     parser.add_argument('--server', required=True)
     args = parser.parse_args()
 
-    exxe = Exxe(args.server,
+    exxe = Exxe(args.server, shell=True,
 		timeout=int(float(args.timeout) * 1000) if args.timeout else None,
 		prefix=args.prefix,
 		error_prefix=args.error_prefix)
