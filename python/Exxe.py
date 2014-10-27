@@ -48,7 +48,7 @@ class Exxe(object):
 	self.cmd = cmd
 	os.write(self.server.stdin.fileno(), '! ' + cmd + '\n')
 
-    def read_result(self, stdout, stderr):
+    def read_result(self, stdout, stderr, strip):
 	if stdout is not None and not isinstance(stdout, file):
 	    stdout = StringIO()
 	if stderr is not None and not isinstance(stderr, file):
@@ -104,7 +104,10 @@ class Exxe(object):
 
 		    def get_output(output):
 			if isinstance(output, StringIO):
-			    return output.getvalue()
+			    if strip:
+				return output.getvalue().strip()
+			    else:
+				return output.getvalue()
 			return None
 
 		    return get_output(stdout), get_output(stderr)
@@ -156,11 +159,11 @@ class Exxe(object):
 	    raise EOFError()
 
     def run(self, cmd, stdin=None, stdout=sys.stdout, stderr=sys.stderr,
-	    quote=True):
+	    quote=True, strip=True):
 	if stdin is not None:
 	    self.write_input(stdin)
 	self.write_command(cmd, quote)
-	return self.read_result(stdout, stderr)
+	return self.read_result(stdout, stderr, strip)
 
 
 if __name__ == '__main__':
@@ -187,7 +190,7 @@ if __name__ == '__main__':
 				  sys.stdin.read() if args.stdin else None,
 				  stdout=args.canonical_output or sys.stdout,
 				  stderr=args.canonical_output or sys.stderr,
-				  quote=not args.no_quote)
+				  quote=not args.no_quote, strip=False)
 	if stdout:
 	    os.write(sys.stdout.fileno(), stdout)
 	if stderr:
