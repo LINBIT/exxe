@@ -605,7 +605,7 @@ static void run_command(struct command *command, struct buffer *in_buffer)
 						reset_buffer(&out_buffer);
 					}
 				}
-				if (FD_ISSET(err[0], &rfds)) {
+				if (err[0] != -1 && FD_ISSET(err[0], &rfds)) {
 					read_from(&err_buffer, &err[0], "standard error");
 					if (!canonical_output) {
 						/* FIXME: Don't print partial lines at the end. */
