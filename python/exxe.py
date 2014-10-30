@@ -11,7 +11,9 @@ import itertools
 import collections
 
 from subprocess import CalledProcessError
-from StringIO import StringIO
+from cStringIO import StringIO
+
+__all__ = ['Exxe', 'run']
 
 
 class ProcessTimeoutError(CalledProcessError):
@@ -28,11 +30,11 @@ class Exxe(object):
 				       stdin=subprocess.PIPE,
 				       stdout=subprocess.PIPE)
 	self.timeout = timeout
-	self.prefix = prefix if prefix else ''
-	self.error_prefix = error_prefix if error_prefix else self.prefix
+	self.prefix = prefix if prefix is not None else ''
+	self.error_prefix = error_prefix if error_prefix is not None else self.prefix
 
     def write_input(self, stdin):
-	for line in stdin.splitlines(True):
+	for line in stdin:
 	    if line[-1] != '\n':
 		x = '<' + str(len(line)) + ' ' + line + '\n'
 	    elif re.match(r'[\000-\037\200-\377]', line):
@@ -48,11 +50,7 @@ class Exxe(object):
 	self.cmd = cmd
 	os.write(self.server.stdin.fileno(), '! ' + cmd + '\n')
 
-    def read_result(self, stdout, stderr, strip):
-	if stdout is not None and not isinstance(stdout, file):
-	    stdout = StringIO()
-	if stderr is not None and not isinstance(stderr, file):
-	    stderr = StringIO()
+    def read_result(self, stdout, stderr, prefix, error_prefix):
 	poller = select.poll()
 	poller.register(self.server.stdout.fileno(),
 			select.POLLIN | select.POLLPRI)
@@ -101,35 +99,19 @@ class Exxe(object):
 		if status == 0:
 		    if c != '\n':
 			raise IOError('Parsing exxe output')
-
-		    def get_output(output):
-			if isinstance(output, StringIO):
-			    if strip:
-				return output.getvalue().strip()
-			    else:
-				return output.getvalue()
-			return None
-
-		    return get_output(stdout), get_output(stderr)
 		else:
 		    raise CalledProcessError(status, self.cmd)
 
 	def read_output(c):
-	    def write_output(where, output):
-		if isinstance(where, file):
-		    os.write(where.fileno(), output)
-		elif isinstance(where, StringIO):
-		    where.write(output)
-
 	    while c == ' ' or c == '\t' or c == '\n':
 		c = reader.next()
 	    if c == '2':
 		where = stderr
-		prefix = self.error_prefix
+		pfx = error_prefix
 		c = reader.next()
 	    else:
 		where = stdout
-		prefix = self.prefix
+		pfx = prefix
 	    if c != '>':
 		raise IOError('Parsing exxe output')
 	    c = reader.next()
@@ -138,7 +120,7 @@ class Exxe(object):
 		if c == ' ':
 		    c = reader.next()
 		read = itertools.islice(reader, length - 1)
-		write_output(where, prefix + c + ''.join(read))
+		where.write(pfx + c + ''.join(read))
 	    else:
 		if c == ' ':
 		    c = reader.next()
@@ -146,24 +128,72 @@ class Exxe(object):
 		    read = []
 		else:
 		    read = itertools.takewhile(lambda c: c != '\n', reader)
-		write_output(where, prefix + c + ''.join(read) + '\n')
+		where.write(pfx + c + ''.join(read) + '\n')
+	    where.flush()
 
 	try:
 	    while True:
 		c = reader.next()
 		if c == '?':
-		    return read_status()
+		    read_status()
+		    return
 		else:
 		    read_output(c)
 	except StopIteration:
 	    raise EOFError()
 
-    def run(self, cmd, stdin=None, stdout=sys.stdout, stderr=sys.stderr,
-	    quote=True, strip=True):
+    def run(self, cmd, stdin=None, stdout=None, stderr=None,
+	    quote=True, prefix=None, error_prefix=None,
+	    return_stdout=False):
+	if return_stdout:
+	    stdout = StringIO()
+	    if prefix is None:
+		prefix = ''
+	if error_prefix is None:
+	    error_prefix = prefix if prefix else self.error_prefix
+	if prefix is None:
+	    prefix = self.prefix
 	if stdin is not None:
 	    self.write_input(stdin)
 	self.write_command(cmd, quote)
-	return self.read_result(stdout, stderr, strip)
+	self.read_result(stdout or sys.stdout, stderr or sys.stderr,
+			 prefix, error_prefix)
+	if return_stdout:
+	    return stdout.getvalue().strip()
+
+
+def run(exxes, cmd, stdout=None, stderr=None, quote=True, catch=False):
+    # FIXME: Refactor read_result() so that it can read from multiple servers
+    # in parallel.
+    if not stdout:
+	stdout = sys.stdout
+    if not stderr:
+	stderr = sys.stderr
+    failed = set()
+
+    for exxe in exxes:
+	try:
+	    exxe.write_command(cmd, quote)
+	except IOError, e:
+	    if catch:
+		stderr.write('%s%s failed' % (self.error_prefix, cmd[0]))
+		failed.add(exxe)
+	    else:
+		raise
+
+    for exxe in exxes:
+	if exxe in failed:
+	    continue
+	try:
+	    exxe.read_result(stdout, stderr, exxe.prefix, exxe.error_prefix)
+	except CalledProcessError, e:
+	    if catch:
+		stderr.write('%s%s failed with status %s' %
+			     (self.error_prefix, cmd[0], e.returncode))
+	    else:
+		raise
+
+    return not failed
 
 
 if __name__ == '__main__':
@@ -186,15 +216,22 @@ if __name__ == '__main__':
 		error_prefix=args.error_prefix)
 
     try:
-	stdout, stderr = exxe.run(args.cmd,
-				  sys.stdin.read() if args.stdin else None,
-				  stdout=args.canonical_output or sys.stdout,
-				  stderr=args.canonical_output or sys.stderr,
-				  quote=not args.no_quote, strip=False)
-	if stdout:
-	    os.write(sys.stdout.fileno(), stdout)
-	if stderr:
-	    os.write(sys.stderr.fileno(), stderr)
+	if args.stdin:
+	    stdin = sys.stdin
+	else:
+	    stdin = None
+	if args.canonical_output:
+	    stdout = StringIO()
+	    stderr = StringIO()
+	else:
+	    stdout = None
+	    stderr = None
+	exxe.run(args.cmd, stdin=stdin, stdout=stdout, stderr=stderr,
+		 quote=not args.no_quote)
+	if args.canonical_output:
+	    sys.stdout.write(stdout.getvalue())
+	    sys.stdout.flush()
+	    sys.stderr.write(stderr.getvalue())
     except ProcessTimeoutError, error:
 	print >> sys.stderr, error
 	sys.exit(128 - error.returncode)

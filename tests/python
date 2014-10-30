@@ -5,7 +5,7 @@ use_local_exxe
 use_tmpdir
 
 py_exxe() {
-    $abs_top_builddir/python/Exxe.py --server=$abs_top_builddir/exxe/exxe "$@"
+    $abs_top_builddir/python/exxe.py --server=$abs_top_builddir/exxe/exxe "$@"
 }
 
 backspace="`echo -e '\b'`"
