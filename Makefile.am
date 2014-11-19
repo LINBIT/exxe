@@ -1,4 +1,4 @@
-SUBDIRS = exxe tests
+SUBDIRS = exxe python tests
 
 AM_MAKEFLAGS = --no-print-directory
 

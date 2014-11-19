@@ -1,5 +1,12 @@
 %define src_version @VERSION@
 
+# Compatibility macros for distros (fedora) that don't provide Python macros by default
+# Do this instead of trying to conditionally include {_rpmconfigdir}/macros.python
+%{!?py_ver: %{expand: %%global py_ver %%(echo `python -c "import sys; print sys.version[:3]"`)}}
+%{!?py_prefix: %{expand: %%global py_prefix %%(echo `python -c "import sys; print sys.prefix"`)}}
+%{!?py_libdir: %{expand: %%global py_libdir %%{expand:%%%%{py_prefix}/%%%%{_lib}/python%%%%{py_ver}}}}
+%{!?py_sitedir: %{expand: %%global py_sitedir %%{expand:%%%%{py_libdir}/site-packages}}}
+
 Name: @PACKAGE@
 Version: %(set -- %{src_version}; echo ${1%%-*})
 Release: %(set -- %{src_version}; if [ ${1#*-} != $1 ]; then echo ${1#*-}; else echo 0; fi)
@@ -12,6 +19,7 @@ Prefix: %{_prefix}
 Vendor: @PACKAGE_BUGREPORT@
 Url: @PACKAGE_URL@
 BuildRequires: gcc
+BuildRequires: python
 
 %description
 A shell-like utility that executes arbitrary commands read from standard input
@@ -33,3 +41,4 @@ rm -rf %{buildroot}
 %files
 %defattr(-,root,root)
 /usr/bin/exxe
+%{py_sitedir}/exxe.*
