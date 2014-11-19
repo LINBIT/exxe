@@ -26,6 +26,14 @@ class ProcessTimeoutError(CalledProcessError):
 
 class Exxe(object):
     def __init__(self, server, shell=False, timeout=None, prefix=None, error_prefix=None):
+	"""
+	Keyword arguments:
+	server -- command that starts the exxe server
+	shell -- start the server command in a shell
+	timeout -- default command timeout
+	prefix -- default prefix for output
+	error_prefix -- default prefix for error output (defaults to prefix)
+	"""
 	self.server = subprocess.Popen(server, shell=shell,
 				       stdin=subprocess.PIPE,
 				       stdout=subprocess.PIPE)
@@ -145,6 +153,20 @@ class Exxe(object):
     def run(self, cmd, stdin=None, stdout=None, stderr=None,
 	    quote=True, prefix=None, error_prefix=None,
 	    return_stdout=False):
+	"""
+	Run command cmd (a list of strings).  Raises CalledProcessError if cmd
+	terminates with a non-zero exit status, and ProcessTimeoutError if the
+	command times out.
+
+	Keyword arguments:
+	stdin -- standard input to command (file)
+	stdout -- standard output from command (file)
+	stderr -- standard error output from command (file)
+	quote -- use shell quoting to prevent environment variable substitution in commands
+	prefix -- override default prefix (see __init__)
+	error_prefix -- override default error_prefix (see __init__)
+	return_stdout -- if true, return standard output instead (strips leading / trailing whitespace)
+	"""
 	if return_stdout:
 	    stdout = StringIO()
 	    if prefix is None:
@@ -163,6 +185,14 @@ class Exxe(object):
 
 
 def run(exxes, cmd, stdout=None, stderr=None, quote=True, catch=False):
+    """
+    Run a command on multiple Exxe instances.
+
+    Keyword arguments:
+    catch -- When true, report command failures on stderr.  Returns False when
+    a command has failed.
+    """
+
     # FIXME: Refactor read_result() so that it can read from multiple servers
     # in parallel.
     if not stdout:
