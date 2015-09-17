@@ -54,7 +54,7 @@ class Exxe(object):
     def write_command(self, cmd, quote):
 	if isinstance(cmd, basestring):
 	    cmd = [cmd]
-	cmd = ' '.join([pipes.quote(arg) for arg in cmd] if quote else cmd)
+	cmd = ' '.join([pipes.quote(str(arg)) for arg in cmd] if quote else cmd)
 	self.cmd = cmd
 	os.write(self.server.stdin.fileno(), '! ' + cmd + '\n')
 
