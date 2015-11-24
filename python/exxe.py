@@ -219,7 +219,7 @@ def run(exxes, cmd, stdout=None, stderr=None, quote=True, catch=False):
 	except CalledProcessError, e:
 	    if catch:
 		stderr.write('%s%s failed with status %s' %
-			     (self.error_prefix, cmd[0], e.returncode))
+			     (exxe.error_prefix, cmd[0], e.returncode))
 	    else:
 		raise
 
