@@ -99,14 +99,14 @@ class Exxe(object):
 	    if c == '(':
 		c, signal = read_number(reader.next())
 		if c != ')':
-		    raise IOError('Parsing exxe output')
+		    raise IOError('Parsing exxe output ")" - have %s %s' % (c, signal))
 		consume(itertools.takewhile(lambda c: c != '\n', reader))
 		raise CalledProcessError(-signal, self.cmd)
 	    else:
 		c, status = read_number(c)
 		if status == 0:
 		    if c != '\n':
-			raise IOError('Parsing exxe output')
+			raise IOError('Parsing exxe output "\\n"')
 		else:
 		    raise CalledProcessError(status, self.cmd)
 
@@ -121,7 +121,7 @@ class Exxe(object):
 		where = stdout
 		pfx = prefix
 	    if c != '>':
-		raise IOError('Parsing exxe output')
+		raise IOError('Parsing exxe output ">" - where %s, pfx %s, c %s' % (where, pfx, c))
 	    c = reader.next()
 	    if c >= '0' and c <= '9':
 		c, length = read_number(c)
