@@ -994,7 +994,7 @@ int main(int argc, char *argv[])
 		}
 
 		if (stdin_dup != -1) {
-			if (dup2(stdin_dup, 0) < 0);
+			if (dup2(stdin_dup, 0) < 0)
 				fatal("restoring standard input");
 			close(stdin_dup);
 			if (close(opt_output))
