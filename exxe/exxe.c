@@ -537,8 +537,8 @@ static void run_command(struct command *command, struct buffer *in_buffer)
 		fcntl(out[0], F_SETFL, O_NONBLOCK);
 		fcntl(err[0], F_SETFL, O_NONBLOCK);
 
-		init_buffer(&out_buffer, 1 << 12);
-		init_buffer(&err_buffer, 1 << 12);
+		init_buffer(&out_buffer, 1 << 16);
+		init_buffer(&err_buffer, 1 << 16);
 
 		for(;;) {
 			int nfds = 0;
@@ -917,7 +917,7 @@ int main(int argc, char *argv[])
 		if (read_from_stdin) {
 			struct buffer in_buffer;
 
-			init_buffer(&in_buffer, 1 << 12);
+			init_buffer(&in_buffer, 1 << 16);
 			for(;;) {
 				ssize_t size;
 
@@ -1007,7 +1007,7 @@ int main(int argc, char *argv[])
 		/* server mode */
 
 		set_signals_for_commands();
-		init_buffer(&input.input, 1 << 12);
+		init_buffer(&input.input, 1 << 16);
 		init_command(&input.command);
 		read_from_stdin = false;
 

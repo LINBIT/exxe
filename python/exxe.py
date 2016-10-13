@@ -72,7 +72,7 @@ class Exxe(object):
 		    ready = poller.poll(self.timeout)
 		    if not ready:
 			raise ProcessTimeoutError(self.cmd)
-		    data = os.read(self.server.stdout.fileno(), 4096)
+		    data = os.read(self.server.stdout.fileno(), 128*1024)
 		    if not data:
 			raise StopIteration()
 		    idx = 0
