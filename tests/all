@@ -59,6 +59,15 @@ check 'exxe ./missing' <<EOF
 ? 127
 EOF
 
+# binary, no trailing new line
+check 'exxe --canonical-output sh -c "printf \"x\0\001\n\002\0\003\004\373\"" | od -t c -t x1' <<EOF
+0000000   >   4       x  \0 001  \n   >   5     002  \0 003 004 373  \n
+         3e  34  20  78  00  01  0a  3e  35  20  02  00  03  04  fb  0a
+0000020   ?       0  \n
+         3f  20  30  0a
+0000024
+EOF
+
 # ==============================================================
 # Exit status
 

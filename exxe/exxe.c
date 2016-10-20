@@ -86,10 +86,12 @@ static void print_str(const char *str, int size, int fd)
 		printf("%u", fd);
 	if (is_printable(str, size))
 		printf("%c %.*s", inout, size, str);
-	else if (str[size - 1] == '\n')
-		printf("%c%u %.*s", inout, size, size, str);
-	else
-		printf("%c%u %.*s\n", inout, size, size, str);
+	else {
+		printf("%c%u ", inout, size);
+		fwrite(str, size, 1, stdout);
+		if (str[size - 1] != '\n')
+			putchar('\n');
+	}
 }
 
 static void print_buffer(struct buffer *buffer, int fd)
