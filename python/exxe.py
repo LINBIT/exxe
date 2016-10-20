@@ -111,8 +111,6 @@ class Exxe(object):
 		    raise CalledProcessError(status, self.cmd)
 
 	def read_output(c):
-	    while c == ' ' or c == '\t' or c == '\n':
-		c = reader.next()
 	    if c == '2':
 		where = stderr
 		pfx = error_prefix
@@ -142,6 +140,8 @@ class Exxe(object):
 	try:
 	    while True:
 		c = reader.next()
+		while c == ' ' or c == '\t' or c == '\n':
+		    c = reader.next()
 		if c == '?':
 		    read_status()
 		    return

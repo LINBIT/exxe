@@ -57,6 +57,11 @@ check 'py_exxe -- ./missing || echo status: $?' <<EOF
 status: 127
 EOF
 
+# no trailing newline
+check 'py_exxe -- printf asdf ; printf "\n"' <<EOF
+asdf
+EOF
+
 # ==============================================================
 # Exit status
 
