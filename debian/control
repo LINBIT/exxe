@@ -1,0 +1,16 @@
+Source: exxe
+Section: admin
+Priority: optional
+Maintainer: Roland Kammerer <roland.kammerer@linbit.com>
+Build-Depends: debhelper (>= 7), autotools-dev
+Standards-Version: 4.1.2
+Homepage: https://github.com/LINBIT/exxe
+#Vcs-Git: https://anonscm.debian.org/git/collab-maint/exxe-0.8.1.7.git
+#Vcs-Browser: https://anonscm.debian.org/cgit/collab-maint/exxe-0.8.1.7.git
+
+Package: exxe
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends} ${python:Depends}
+Description: Execute commands read from stdin
+ A shell-like utility that executes arbitrary commands read from standard input
+ and reports the results of those commands on standard output.
