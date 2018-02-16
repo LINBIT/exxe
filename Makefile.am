@@ -5,7 +5,7 @@ AM_MAKEFLAGS = --no-print-directory
 distclean-local:
 	rm -rf build
 
-EXTRA_DIST = $(top_srcdir)/.version
+EXTRA_DIST = $(top_srcdir)/.version $(top_srcdir)/build-aux/git-version-gen $(top_srcdir)/build-aux/gitlog-to-changelog
 BUILT_SOURCES = $(top_srcdir)/.version
 $(top_srcdir)/.version:
 	echo $(VERSION) > $@-t && mv $@-t $@
