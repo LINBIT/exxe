@@ -1,3 +1,9 @@
+exxe (0.8.2-1) unstable; urgency=medium
+
+  * Python 3 upgrade
+
+ -- Christoph Böhmwalder <christoph.boehmwalder@linbit.com>  Wed, 25 Sep 2019 14:07:43 +0200
+
 exxe (0.8.1-1) unstable; urgency=medium
 
   * Initial release
