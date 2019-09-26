@@ -1,5 +1,9 @@
 #!/usr/bin/make -f
-#export DH_VERBOSE = 1
+export DH_VERBOSE = 1
 
 %:
-	dh $@
+	dh $@ --with python3
+
+override_dh_auto_install:
+	python3 $(CURDIR)/python/setup.py build install --install-layout=deb \
+		--root $(CURDIR)/debian/exxe

@@ -12,7 +12,8 @@ EXTRA_DIST = $(top_srcdir)/.version \
 				 $(top_srcdir)/debian/compat \
 				 $(top_srcdir)/debian/control \
 				 $(top_srcdir)/debian/copyright \
-				 $(top_srcdir)/debian/rules
+				 $(top_srcdir)/debian/rules \
+				 $(top_srcdir)/python/setup.py
 BUILT_SOURCES = $(top_srcdir)/.version
 $(top_srcdir)/.version:
 	echo $(VERSION) > $@-t && mv $@-t $@

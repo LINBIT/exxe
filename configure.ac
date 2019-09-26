@@ -1,5 +1,5 @@
 AC_INIT([exxe],
-        m4_esyscmd([build-aux/git-version-gen .tarball-version]),
+        0.8.2,
         [Andreas Gruenbacher <andreas.gruenbacher@gmail.com>],
         ,
         [http://git.drbd.org/exxe.git])
@@ -14,7 +14,7 @@ AC_CONFIG_FILES([
 AM_INIT_AUTOMAKE
 AM_SILENT_RULES([yes])
 
-AM_PATH_PYTHON
+AM_PATH_PYTHON([3.0])
 
 AC_PROG_CC
 AC_PROG_CC_STDC
