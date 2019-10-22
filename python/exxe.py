@@ -45,20 +45,36 @@ class Exxe(object):
 
     def write_input(self, stdin):
         for line in stdin:
-            if line[-1] != '\n':
-                x = '<' + str(len(line)) + ' ' + line + '\n'
-            elif re.match(r'[\000-\037\200-\377]', line):
-                x = '<' + str(len(line)) + ' ' + line
+            if sys.version_info.major > 2:
+                line = bytes(line, "utf-8")
+                l = len(line)
             else:
-                x = '< ' + line
-            os.write(self.server.stdin.fileno(), x.encode())
+                l = len(line)
+
+            eol = ''
+            num_bytes = str(l)
+            if line[-1] != '\n':
+                eol = '\n'
+            elif not re.match(r'[\000-\037\200-\377]', line):
+                num_bytes = ''
+            if sys.version_info.major > 2:
+                out = "<" + num_bytes + " " + line.decode("utf-8") + eol
+                out = out.encode("utf-8")
+            else:
+                out = "<" + num_bytes + " " + line + eol
+            #print("### %s ###" % out)
+            os.write(self.server.stdin.fileno(), out)
 
     def write_command(self, cmd, quote):
-        if isinstance(cmd, str):
+        if isinstance(cmd, (str, bytes)):
             cmd = [cmd]
-        cmd = ' '.join([pipes.quote(str(arg)) for arg in cmd] if quote else cmd)
+        cmd = ' '.join([pipes.quote(arg) for arg in cmd] if quote else cmd)
         self.cmd = cmd
-        os.write(self.server.stdin.fileno(), ('! ' + cmd + '\n').encode())
+        out = ('! ' + cmd + '\n')
+        #print("#### %s ####" % out)
+        if sys.version_info.major > 2:
+            out = os.fsencode(out)
+        os.write(self.server.stdin.fileno(), out)
 
     def read_result(self, stdout, stderr, prefix, error_prefix):
         poller = select.poll()
@@ -74,18 +90,23 @@ class Exxe(object):
                     ready = poller.poll(self.timeout)
                     if not ready:
                         raise ProcessTimeoutError(self.cmd)
-                    raw_data = os.read(self.server.stdout.fileno(), 128*1024)
-                    if not raw_data:
+                    data = bytes(os.read(self.server.stdout.fileno(), 128*1024))
+                    if not data:
                         raise StopIteration()
-                    data = raw_data.decode()
+                    #print(">>> data(%u): %s <<<" % (len(data), data), file=sys.stderr)
                     idx = 0
-                yield data[idx]
+                if sys.version_info.major > 2:
+                    #print(">>> b'\\x%02x' %c [%u/%u]<<<" % (data[idx], data[idx], idx, len(data)), file=sys.stderr)
+                    yield bytes([data[idx]])
+                else:
+                    #print(">>> b'\\x%02x' %c [%u/%u]<<<" % (ord(data[idx]), data[idx], idx, len(data)), file=sys.stderr)
+                    yield data[idx]
                 idx += 1
         reader = reader_generator()
 
         def read_number(c):
             number = 0
-            while c >= '0' and c <= '9':
+            while c >= b'0' and c <= b'9':
                 number = (10 * number) + ord(c) - ord('0')
                 c = next(reader)
             return c, number
@@ -97,55 +118,58 @@ class Exxe(object):
                 collections.deque(iterator, maxlen=0)
 
             c = next(reader)
-            if c == ' ':
+            if c == b' ':
                 c = next(reader)
-            if c == '(':
+            if c == b'(':
                 c, signal = read_number(next(reader))
-                if c != ')':
+                if c != b')':
                     raise IOError('Parsing exxe output ")" - have %s %s' % (c, signal))
-                consume(itertools.takewhile(lambda c: c != '\n', reader))
+                consume(itertools.takewhile(lambda c: c != b'\n', reader))
                 raise CalledProcessError(-signal, self.cmd)
             else:
                 c, status = read_number(c)
                 if status == 0:
-                    if c != '\n':
+                    if c != b'\n':
                         raise IOError('Parsing exxe output "\\n"')
                 else:
                     raise CalledProcessError(status, self.cmd)
 
         def read_output(c):
-            if c == '2':
+            # print(type(c), file=sys.stderr)
+            # print(">>>> %s <<<<" % c, file=sys.stderr)
+            if c == b'2':
                 where = stderr
                 pfx = error_prefix
                 c = next(reader)
             else:
                 where = stdout
                 pfx = prefix
-            if c != '>':
+            if c != b'>':
                 raise IOError('Parsing exxe output ">" - where %s, pfx %s, c %s' % (where, pfx, c))
             c = next(reader)
-            if c >= '0' and c <= '9':
+            if c >= b'0' and c <= b'9':
                 c, length = read_number(c)
-                if c == ' ':
+                if c == b' ':
                     c = next(reader)
-                read = itertools.islice(reader, length - 1)
-                where.write(pfx + c + ''.join(read))
+                read = [c]
+                read[1:] = itertools.islice(reader, length - 1)
+                where.write((pfx.encode() + b''.join(read)).decode("utf-8"))
             else:
-                if c == ' ':
+                if c == b' ':
                     c = next(reader)
-                if c == '\n':
-                    read = []
-                else:
-                    read = itertools.takewhile(lambda c: c != '\n', reader)
-                where.write(pfx + c + ''.join(read) + '\n')
+                read = [c]
+                if c != b'\n':
+                    read[1:] = itertools.takewhile(lambda c: c != b'\n', reader)
+                where.write((pfx.encode() + b''.join(read) + b'\n').decode("utf-8"))
             where.flush()
 
         try:
             while True:
                 c = next(reader)
-                while c == ' ' or c == '\t' or c == '\n':
+                # print(">>>> %s" % c, file=sys.stderr)
+                while c == b' ' or c == b'\t' or c == b'\n':
                     c = next(reader)
-                if c == '?':
+                if c == b'?':
                     read_status()
                     return
                 else:
@@ -233,6 +257,13 @@ def run(exxes, cmd, stdout=None, stderr=None, quote=True, catch=False):
 if __name__ == '__main__':
     import argparse
 
+    # To properly propagate the died-by-signal status,
+    # if the command we called via exxe died by signal,
+    # we re-raise that same signal here, to our whole process group.
+    # To not kill "too many" in that case, including potentially our parent
+    # shell, we setpgid() first.
+    os.setpgid(0,0)
+
     parser = argparse.ArgumentParser(description='Execute commands indirectly (client).')
     parser.add_argument('cmd', nargs='+')
     parser.add_argument('-p', '--stdin', action='store_true')
@@ -248,6 +279,7 @@ if __name__ == '__main__':
                 timeout=int(float(args.timeout) * 1000) if args.timeout else None,
                 prefix=args.prefix,
                 error_prefix=args.error_prefix)
+
 
     try:
         if args.stdin:
@@ -271,8 +303,7 @@ if __name__ == '__main__':
         sys.exit(128 - error.returncode)
     except CalledProcessError as error:
         if error.returncode < 0:
-            # FIXME: Python seems to catch SIGINT; it doesn't get through to
-            # user space
+            signal.signal(signal.SIGINT, signal.SIG_DFL)
             os.kill(0, -error.returncode)
         else:
             sys.exit(error.returncode)

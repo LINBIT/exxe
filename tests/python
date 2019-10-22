@@ -4,8 +4,11 @@
 use_local_exxe
 use_tmpdir
 
+export PYTHONIOENCODING=utf-8
+: PYTHON_TO_TEST :: ${PYTHON_TO_TEST:=python}
+
 py_exxe() {
-    $abs_top_builddir/python/exxe.py --server=$abs_top_builddir/exxe/exxe "$@"
+    $PYTHON_TO_TEST $abs_top_builddir/python/exxe.py --server=$abs_top_builddir/exxe/exxe "$@"
 }
 
 backspace="`echo -e '\b'`"
@@ -14,6 +17,10 @@ backspace="`echo -e '\b'`"
 
 check 'py_exxe echo foo || echo status: $?' <<EOF
 foo
+EOF
+
+check 'py_exxe -- echo "Umlaute: äöüß blubber blabber" || echo status: $?' <<EOF
+Umlaute: äöüß blubber blabber
 EOF
 
 check 'py_exxe -- echo -e "foo\nbar"' <<EOF
@@ -46,6 +53,11 @@ EOF
 # Read from standard input (default for direct commands)
 check 'echo foo | py_exxe -p -- cat' <<EOF
 foo
+EOF
+
+# Read binary data from standard input
+check 'echo B8Okw7bDvMOfEjYKCgp4 | base64 -d | py_exxe -p -- base64' <<EOF
+B8Okw7bDvMOfEjYKCgp4
 EOF
 
 # Do not read from standard input
@@ -90,24 +102,25 @@ EOF
 
 # FIXME: How can we catch those signals here?
 
-#check 'py_exxe --timeout=0.1 -- sleep 0.2 || echo status: $?' <<EOF
-#Command 'sleep 0.2' timed out
-#status: 143
-#EOF
+check 'py_exxe --timeout=0.1 -- sleep 0.2 || echo status: $?' <<EOF
+Command 'sleep 0.2' timed out
+status: 143
+EOF
 
 # ==============================================================
 # Termination by signal
 
 # FIXME: How can we catch those signals here?
 
-#check 'py_exxe -- kill -INT 0 || echo status: $?' <<EOF
-#130
-#EOF
+check 'py_exxe -- kill -INT 0 || echo status: $?' <<EOF
+status: 130
+EOF
 
-#check 'py_exxe -- kill -ALRM 0 || echo status: $?' <<EOF
-#142
-#EOF
+check 'py_exxe -- kill -ALRM 0 || echo status: $?' <<EOF
+Timeout
+status: 142
+EOF
 
-#check 'py_exxe -- kill -TERM 0 || echo status: $?' <<EOF
-#143
-#EOF
+check 'py_exxe -- kill -TERM 0 || echo status: $?' <<EOF
+status: 143
+EOF
